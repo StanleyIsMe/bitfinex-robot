@@ -1,6 +1,7 @@
 package bfApi
 
 import (
+	"encoding/json"
 	//"github.com/davecgh/go-spew/spew"
 	"fmt"
 	"log"
@@ -51,38 +52,34 @@ func FundingAction() {
 
 	utils.PrintWithStruct(snap)
 
+
+
+
 	// matched funding offer history
-	fmt.Println("funding offer history", "===================================")
-	snapHist, err := client.Funding.OfferHistory("fUSD")
-	if err != nil {
-		panic(err)
-	}
+	//fmt.Println("funding offer history", "===================================")
+	//snapHist, err := client.Funding.OfferHistory("fUSD")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//utils.PrintWithStruct(snapHist)
 
-	utils.PrintWithStruct(snapHist)
+	//fmt.Println("active credits", "===================================")
+	//snapCredits, err := client.Funding.Credits("fUSD")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//utils.PrintWithStruct(snapCredits)
 
-	fmt.Println("active credits", "===================================")
-	snapCredits, err := client.Funding.Credits("fUSD")
-	if err != nil {
-		panic(err)
-	}
-	utils.PrintWithStruct(snapCredits)
 
-	// credits history
-	fmt.Println("credits history", "===================================")
-	napCreditsHist, err := client.Funding.CreditsHistory("fUSD")
-	if err != nil {
-		panic(err)
-	}
 
-	utils.PrintWithStruct(napCreditsHist)
-
-	// funding trades
-	fmt.Println("funding trades", "===================================")
-	napTradesHist, err := client.Funding.Trades("fUSD")
-	if err != nil {
-		panic(err)
-	}
-	utils.PrintWithStruct(napTradesHist)
+	// my funding matched trades
+	//fmt.Println("funding trades", "===================================")
+	//napTradesHist, err := client.Funding.Trades("fUSD")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//utils.PrintWithStruct(napTradesHist)
 }
 
 func PositionsAction(){
@@ -149,18 +146,61 @@ func TickerAction() {
 }
 
 // 每日funding offer 利息獲得及總資產
-func LedgersAction() {
+func GetLedgers() []*bitfinex.Ledger{
 	now:= time.Now()
-	fmt.Println(now.UnixNano())
-	result, err := client.Ledgers.Ledgers("USD", 0, 1580139221740, 500)
+	end := now.UnixNano()/ int64(time.Millisecond)
+
+	result, err := client.Ledgers.Ledgers("USD", 0, end, 500)
 	if err != nil {
-		log.Fatalf("getting orders: %s", err)
+		log.Fatalf("getting Ledgers: %s", err)
+		return nil
 	}
 
-	utils.PrintWithStruct(result)
+	return result.Snapshot
+}
+type BookInfo struct {
+	ID          int64       // the book update ID, optional
+	Symbol      string      // book symbol
+	Price       float64     // updated price
+	PriceJsNum  json.Number // update price as json.Number
+	Count       int64       // updated count, optional
+	Amount      float64     // updated amount
+	AmountJsNum json.Number // update amount as json.Number
+	//Side        OrderSide   // side
+	//Action      BookAction  // action (add/remove)
 }
 
-func submitFundingOffer(symbol string, ffr bool, rate float64, day int64){
+func GetBook(precision bitfinex.BookPrecision) (bid []*bitfinex.BookUpdate, offer []*bitfinex.BookUpdate ,err error){
+	book, err := client.Book.All(bitfinex.FundingPrefix+"USD", precision, 100)
+
+	if err != nil {
+		log.Fatalf("getting book: %s", err)
+		return
+	}
+
+	return book.Snapshot[0:100], book.Snapshot[100:], nil
+}
+
+
+
+func GetMatched(limit int) ([]*bitfinex.Trade, error){
+	fiveMin, _ := time.ParseDuration("-2h")
+
+	now:= time.Now()
+	start:= bitfinex.Mts(now.Add(fiveMin).UnixNano()/ int64(time.Millisecond))
+	end := bitfinex.Mts(now.UnixNano()/ int64(time.Millisecond))
+
+	matchedList, err := client.Trades.PublicHistoryWithQuery(bitfinex.FundingPrefix+"USD", start,end, bitfinex.QueryLimit(limit), bitfinex.NewestFirst)
+
+	if err != nil {
+		log.Fatalf("getting matched list: %v", err)
+		return nil, err
+	}
+
+	return matchedList.Snapshot, nil
+}
+
+func SubmitFundingOffer(symbol string, ffr bool, amount float64,rate float64, day int64) error{
 	fundingType := "LIMIT"
 	if ffr {
 		fundingType = "FRRDELTAVAR"
@@ -169,15 +209,17 @@ func submitFundingOffer(symbol string, ffr bool, rate float64, day int64){
 	fo, err := client.Funding.SubmitOffer(&bitfinex.FundingOfferRequest{
 		Type: fundingType,
 		Symbol: symbol,
-		Amount: 50,
+		Amount: amount,
 		Rate: rate,
 		Period: day,
 		Hidden: false,
 	})
 	if err != nil {
-		panic(err)
+		log.Printf("Funding Offer Failed : %v", err)
+		return err
 	}
 	newOffer := fo.NotifyInfo.(*bitfinex.FundingOfferNew)
 	utils.PrintWithStruct(newOffer)
+	return nil
 }
 

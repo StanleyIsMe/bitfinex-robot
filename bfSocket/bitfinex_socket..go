@@ -3,11 +3,10 @@ package bfSocket
 import (
 	"log"
 	"os"
-	"fmt"
 	//"sync"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
-	"github.com/davecgh/go-spew/spew"
+	"robot/policy"
 	"robot/utils"
 
 	//"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
@@ -35,18 +34,44 @@ func SocketInit() {
 	}
 }
 
-func Listen(){
+func Listen(notifyChannel chan int){
+	//ctx, cxl2 := context.WithTimeout(context.Background(), time.Second*5)
+	//defer cxl2()
+	//_, err := socket.SubscribeTicker(ctx, "fUSD")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	//ctx, cxl2 := context.WithTimeout(context.Background(), time.Second*5)
+	//defer cxl2()
+	//_, err := socket.SubscribeBook(ctx, "fUSD", bitfinex.Precision2, bitfinex.FrequencyTwoPerSecond, 25)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//ctx, cxl3 := context.WithTimeout(context.Background(), time.Second*5)
+	//defer cxl3()
+	//_, err = socket.SubscribeTrades(ctx, bitfinex.FundingPrefix+"USD")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+
 	go func() {
+		wallet := policy.NewWallet()
 		for obj := range socket.Listen() {
 			switch obj.(type) {
 			case error:
-				log.Printf("channel closed: %s", obj)
-				utils.SendEmail(fmt.Sprintf("channel closed: %s", obj), "robot socket error")
+				log.Printf("Socket error: %v", obj.(error))
+				lineBot.LineSendMessage("Socket error")
+				//utils.SendEmail(fmt.Sprintf("channel closed: %s", obj), "robot socket error")
 			case *bitfinex.WalletUpdate:
 				walletStatus := obj.(*bitfinex.WalletUpdate)
-				if walletStatus.BalanceAvailable > 50 && walletStatus.Type == "funding"{
+				wallet.Update(walletStatus.Balance, walletStatus.BalanceAvailable)
+				if walletStatus.BalanceAvailable >= 50 && walletStatus.Type == "funding"{
 					content, _ := utils.JsonString(walletStatus)
 					lineBot.LineSendMessage(content)
+					notifyChannel<-1
 					//SendEmail(content, "wallet status")
 				}
 
@@ -63,39 +88,51 @@ func Listen(){
 					//SendEmail(content, fmt.Sprintf("New Funding Executed :$%f ,rate: %f", fundingStatus.Amount, fundingStatus.Rate) )
 				}
 				// 即時最新funding offer/bid 價況，及matched 價格
-			case *bitfinex.Ticker:
-				ticker := obj.(*bitfinex.Ticker)
-				content, _ := utils.JsonString(ticker)
-				lineBot.LineSendMessage(content)
+			//case *bitfinex.Ticker:
+			//	ticker := obj.(*bitfinex.Ticker)
+			//	content, _ := utils.JsonString(ticker)
+			//	lineBot.LineSendMessage(content)
+			//case *bitfinex.Trade:
+			//	utils.PrintWithStruct(obj)
+			//	//matchedRealTime := obj.(*bitfinex.Trade)
+			//	//content, _ := utils.JsonString(ticker)
+			//	//lineBot.LineSendMessage(content)
 				// 個人funding 交易 即時狀況
 			case *bitfinex.FundingTrade:
 				fundingTrade := obj.(*bitfinex.FundingTrade)
 				content, _ := utils.JsonString(fundingTrade)
 				lineBot.LineSendMessage(content)
+
 			default:
+				//utils.PrintWithStruct(obj)
 			}
+
+
 			//fmt.Println("MSG RECV:===============")
 			////JsonPrint(obj)
 			////fmt.Println("SPEW ==============")
-			spew.Dump(obj)
+			//spew.Dump(obj)
 			////log.Printf("MSG RECV: %#v", obj)
 			//
 			//// Load the latest orderbook
 
-			//ob, _ := c.GetOrderbook("fUSD")
+			//ob, _ := socket.GetOrderbook("fUSD")
 			//if ob != nil {
-			//	JsonPrint(ob)
+			//	//utils.PrintWithStruct(ob)
 			//	//fmt.Println("Ask================")
 			//	//JsonPrint(ob.Asks())
 			//	//fmt.Println("Bids================")
-			//	//JsonPrint(ob.Bids())
+			//	utils.PrintWithStruct(ob.Bids())
 			//	//log.Printf("Orderbook asks: %v", ob.Asks())
 			//	//log.Printf("Orderbook bids: %v", ob.Bids())
 			//}
+
+			//ticker,_ := socket.GetOrderbook()
 		}
 	}()
 }
 
 func Close() {
 	socket.Close()
+
 }
