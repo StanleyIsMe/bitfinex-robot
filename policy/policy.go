@@ -102,7 +102,7 @@ func PolicyInit() {
 
 func Policy() (rate float64, day int, err error) {
 	day = 2
-	rate = CalculateMarketPrice()
+	rate = TrackMatchPrice()
 	if rate <= 0.0002 {
 		return 0, 0, errors.New("計算發生問題")
 	}
@@ -120,7 +120,7 @@ func AllocationFunds() {
 
 }
 
-func CalculateMarketPrice() float64 {
+func TrackBookPrice() float64 {
 	// 無效值先隨意暫定
 	inValidRate := 0.0003
 
@@ -148,6 +148,43 @@ func CalculateMarketPrice() float64 {
 
 	if allAbg < bottomRate {
 		return bottomRate
+	}
+
+	return allAbg
+}
+
+func TrackMatchPrice() float64 {
+	// 無效值先隨意暫定
+	inValidRate := 0.0003
+
+	bidListP0, offerListP0, err0 := bfApi.GetBook(bitfinex.Precision0)
+	_, offerListP1, err1 := bfApi.GetBook(bitfinex.Precision1)
+	_, offerListP2, err2 := bfApi.GetBook(bitfinex.Precision2)
+	matchedList, err := bfApi.GetMatched(10000)
+	if err != nil || err0 != nil || err1 != nil || err2 != nil {
+		return 0
+	}
+
+	// 算市場平均價
+	p0Avg := bookAvg(offerListP0, inValidRate)
+	p1Avg := bookAvg(offerListP1, inValidRate)
+	p2Avg := bookAvg(offerListP2, inValidRate)
+	matchAvg1 := matchedAvg(matchedList[0:100], inValidRate)
+	matchAvg2 := matchedAvg(matchedList, inValidRate)
+	//allAbg := (p0Avg*5+p1Avg*2+p2Avg*1+matchAvg1*1+matchAvg2*8)/17
+	allAbg := (p0Avg + p1Avg + p2Avg + matchAvg1*5 + matchAvg2*2) / 10
+
+	bottomRate := MyRateController.BottomRate
+	if bottomRate == 0 {
+		bottomRate = bidListP0[0].Price
+	}
+
+	if bottomRate > allAbg && bottomRate > matchAvg1 {
+		return bottomRate
+	}
+
+	if allAbg <  matchAvg1 {
+		return matchAvg1
 	}
 
 	return allAbg

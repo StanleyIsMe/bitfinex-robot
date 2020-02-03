@@ -7,10 +7,9 @@ import (
 
 	"github.com/joho/godotenv"
 	"robot/bfSocket"
+	"robot/btApi"
 	"robot/crontab"
 	"robot/policy"
-
-	"robot/btApi"
 
 	"robot/lineBot"
 )
@@ -23,6 +22,7 @@ func main() {
 
 	lineBot.LineInit()
 	bfApi.ApiInit()
+
 	bfSocket.SocketInit()
 	crontab.Start()
 
