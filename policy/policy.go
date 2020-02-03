@@ -11,25 +11,24 @@ import (
 )
 
 type CalculateRate struct {
-	MatchedList []*bitfinex.Trade // 最近成交價
-	BookListP0 []*bitfinex.BookUpdate  //
-	BookListP1 []*bitfinex.BookUpdate
-	BookListP2 []*bitfinex.BookUpdate
+	MatchedList []*bitfinex.Trade      // 最近成交價
+	BookListP0  []*bitfinex.BookUpdate //
+	BookListP1  []*bitfinex.BookUpdate
+	BookListP2  []*bitfinex.BookUpdate
 }
 
 type RateControl struct {
-	TopRate float64
-	BottomRate float64
-	FixedAmount float64
-	Day int
-	CrazyRate float64
-	NormalRate float64
+	TopRate      float64
+	BottomRate   float64
+	FixedAmount  float64
+	Day          int
+	CrazyRate    float64
+	NormalRate   float64
 	IncreaseRate float64
-
 }
 
 type FundingInfo struct {
-	Loaned []int
+	Loaned  []int
 	Lending []int
 }
 
@@ -41,22 +40,23 @@ type Wallet struct {
 	wg               *sync.WaitGroup
 }
 
-
-
-
 var MyRateController *RateControl
 var myWallet *Wallet
 var MyOnFunding []int
 
-func NewWallet() *Wallet{
+func NewWallet() *Wallet {
 	var once sync.Once
-	once.Do(func() {
-		myWallet = &Wallet{
-			Balance:          0,
-			BalanceAvailable: 0,
-			wg:               &sync.WaitGroup{},
-		}
-	})
+
+	if myWallet == nil {
+		once.Do(func() {
+			myWallet = &Wallet{
+				Balance:          0,
+				BalanceAvailable: 0,
+				wg:               &sync.WaitGroup{},
+			}
+		})
+	}
+
 	return myWallet
 }
 
@@ -67,7 +67,7 @@ func (object *Wallet) Update(balance, balanceAvailable float64) {
 	object.Unlock()
 }
 
-func (object *Wallet) GetAmount(basicAmount float64) (amount float64){
+func (object *Wallet) GetAmount(basicAmount float64) (amount float64) {
 	amount = basicAmount
 	object.Lock()
 	defer object.Unlock()
@@ -89,19 +89,18 @@ func PolicyInit() {
 	increaseRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_INCREASE_RATE"), 64)
 
 	MyRateController = &RateControl{
-		TopRate:         topRate,
-		BottomRate:      bottomRate,
-		FixedAmount: fixedAmount,
-		Day:         2,
-		CrazyRate:   crazyRate,
-		NormalRate:  normalRate,
+		TopRate:      topRate,
+		BottomRate:   bottomRate,
+		FixedAmount:  fixedAmount,
+		Day:          2,
+		CrazyRate:    crazyRate,
+		NormalRate:   normalRate,
 		IncreaseRate: increaseRate,
 	}
 
 }
 
-
-func Policy() (rate float64, day int , err error){
+func Policy() (rate float64, day int, err error) {
 	day = 2
 	rate = CalculateMarketPrice()
 	if rate <= 0.0002 {
@@ -121,7 +120,7 @@ func AllocationFunds() {
 
 }
 
-func CalculateMarketPrice() float64{
+func CalculateMarketPrice() float64 {
 	// 無效值先隨意暫定
 	inValidRate := 0.0003
 
@@ -140,7 +139,7 @@ func CalculateMarketPrice() float64{
 	matchAvg1 := matchedAvg(matchedList[0:100], inValidRate)
 	matchAvg2 := matchedAvg(matchedList, inValidRate)
 	//allAbg := (p0Avg*5+p1Avg*2+p2Avg*1+matchAvg1*1+matchAvg2*8)/17
-	allAbg := (p0Avg+p1Avg+p2Avg+matchAvg1+matchAvg2)/5
+	allAbg := (p0Avg + p1Avg + p2Avg + matchAvg1 + matchAvg2) / 5
 
 	bottomRate := MyRateController.BottomRate
 	if bottomRate == 0 {
@@ -162,7 +161,7 @@ func bookAvg(list []*bitfinex.BookUpdate, inValidRate float64) (average float64)
 			count++
 		}
 	}
-	return average/count
+	return average / count
 }
 
 func matchedAvg(list []*bitfinex.Trade, inValidRate float64) (average float64) {
@@ -173,7 +172,5 @@ func matchedAvg(list []*bitfinex.Trade, inValidRate float64) (average float64) {
 			count++
 		}
 	}
-	return average/count
+	return average / count
 }
-
-

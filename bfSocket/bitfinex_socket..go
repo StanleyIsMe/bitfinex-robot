@@ -67,8 +67,8 @@ func Listen(notifyChannel chan int){
 				//utils.SendEmail(fmt.Sprintf("channel closed: %s", obj), "robot socket error")
 			case *bitfinex.WalletUpdate:
 				walletStatus := obj.(*bitfinex.WalletUpdate)
-				wallet.Update(walletStatus.Balance, walletStatus.BalanceAvailable)
 				if walletStatus.BalanceAvailable >= 50 && walletStatus.Type == "funding"{
+					wallet.Update(walletStatus.Balance, walletStatus.BalanceAvailable)
 					content, _ := utils.JsonString(walletStatus)
 					lineBot.LineSendMessage(content)
 					notifyChannel<-1

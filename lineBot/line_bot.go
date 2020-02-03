@@ -2,10 +2,7 @@ package lineBot
 
 import (
 	"log"
-	//"net/http"
 	"os"
-	"fmt"
-
 
 	"github.com/line/line-bot-sdk-go/linebot"
 )
@@ -15,9 +12,7 @@ func LineInit() {
 	var err error
 	bot, err = linebot.New(os.Getenv("Line_CHANNEL_SECRET"), os.Getenv("LINE_CHANNEL_TOKEN"))
 	if err != nil {
-		fmt.Printf("New Line-Bot Some thing error : %v", err)
-		//SendEmail(fmt.Sprintf("New Line-Bot Some thing error : %v", err), "Line Bot Error")
-
+		log.Printf("New Line-Bot Some thing error : %v", err)
 	}
 
 	if _, err := bot.ReplyMessage("", linebot.NewTextMessage("hello")).Do(); err != nil {

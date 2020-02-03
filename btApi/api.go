@@ -9,37 +9,17 @@ import (
 	"time"
 	"robot/utils"
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
-	//"github.com/bitfinexcom/bitfinex-api-go/v1"
-	//"github.com/bitfinexcom/bitfinex-api-go/v1"
-	//"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
-	//"github.com/bitfinexcom/bitfinex-api-go/v2"
+
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
 )
 
 var client *rest.Client
+
 func ApiInit() {
-
-
 	key := os.Getenv("API_KEY")
 	secret := os.Getenv("API_SEC")
 	url := os.Getenv("BFX_API_URI")
 	client = rest.NewClientWithURL(url).Credentials(key, secret)
-
-	//wallets, err := client.Wallet.Wallet()
-	//if err != nil {
-	//	log.Fatalf("getting wallet %s", err)
-	//}
-	//fmt.Println(wallets)
-	//spew.Dump(wallets)
-
-	//if wallets != nil {
-	//
-	//	JsonPrint(wallets)
-	//
-	//}
-
-	//FundingAction()
-
 }
 
 func FundingAction() {
@@ -86,7 +66,7 @@ func PositionsAction(){
 	// get active positions
 	positions, err := client.Positions.All()
 	if err != nil {
-		log.Fatalf("getting wallet %s", err)
+		log.Printf("getting wallet %s", err)
 	}
 	if positions != nil {
 		for _, p := range positions.Snapshot {
@@ -99,37 +79,37 @@ func PositionsAction(){
 func StatsAction() {
 	pLStats, err := client.Stats.PositionLast("tBTCUSD", bitfinex.Long)
 	if err != nil {
-		log.Fatalf("getting getting last position stats: %s", err)
+		log.Printf("getting getting last position stats: %s", err)
 	}
 	utils.PrintWithStruct(pLStats)
 
 	pHStats, err := client.Stats.PositionHistory("fUSD", bitfinex.Long)
 	if err != nil {
-		log.Fatalf("getting getting last position stats: %s", err)
+		log.Printf("getting getting last position stats: %s", err)
 	}
 	utils.PrintWithStruct(pHStats)
 
 	scsStats, err := client.Stats.SymbolCreditSizeLast("fUSD", "tBTCUSD")
 	if err != nil {
-		log.Fatalf("getting getting last position stats: %s", err)
+		log.Printf("getting getting last position stats: %s", err)
 	}
 	utils.PrintWithStruct(scsStats)
 
 	scsHistStats, err := client.Stats.SymbolCreditSizeHistory("fUSD", "tBTCUSD")
 	if err != nil {
-		log.Fatalf("getting getting last position stats: %s", err)
+		log.Printf("getting getting last position stats: %s", err)
 	}
 	utils.PrintWithStruct(scsHistStats)
 
 	fStats, err := client.Stats.FundingLast("fUSD")
 	if err != nil {
-		log.Fatalf("getting getting last position stats: %s", err)
+		log.Printf("getting getting last position stats: %s", err)
 	}
 	utils.PrintWithStruct(fStats)
 
 	fhStats, err := client.Stats.FundingHistory("fUSD")
 	if err != nil {
-		log.Fatalf("getting getting last position stats: %s", err)
+		log.Printf("getting getting last position stats: %s", err)
 	}
 	utils.PrintWithStruct(fhStats)
 }
@@ -139,7 +119,7 @@ func TickerAction() {
 	tickers, err := client.Tickers.GetMulti(symbols)
 
 	if err != nil {
-		log.Fatalf("getting ticker: %s", err)
+		log.Printf("getting ticker: %s", err)
 	}
 
 	utils.PrintWithStruct(tickers)
@@ -152,7 +132,7 @@ func GetLedgers() []*bitfinex.Ledger{
 
 	result, err := client.Ledgers.Ledgers("USD", 0, end, 500)
 	if err != nil {
-		log.Fatalf("getting Ledgers: %s", err)
+		log.Printf("getting Ledgers: %s", err)
 		return nil
 	}
 
@@ -174,7 +154,7 @@ func GetBook(precision bitfinex.BookPrecision) (bid []*bitfinex.BookUpdate, offe
 	book, err := client.Book.All(bitfinex.FundingPrefix+"USD", precision, 100)
 
 	if err != nil {
-		log.Fatalf("getting book: %s", err)
+		log.Printf("Get book list: %s", err)
 		return
 	}
 
@@ -193,7 +173,7 @@ func GetMatched(limit int) ([]*bitfinex.Trade, error){
 	matchedList, err := client.Trades.PublicHistoryWithQuery(bitfinex.FundingPrefix+"USD", start,end, bitfinex.QueryLimit(limit), bitfinex.NewestFirst)
 
 	if err != nil {
-		log.Fatalf("getting matched list: %v", err)
+		log.Printf("Get Matched list: %v", err)
 		return nil, err
 	}
 

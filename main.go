@@ -1,30 +1,17 @@
 package main
 
 import (
-	//"context"
-
-	//"time"
-
-
 	"log"
-
-
-	//"net/http"
 	"os"
 	"os/signal"
 
-	//"os/signal"
-
-	//"github.com/davecgh/go-spew/spew"
 	"github.com/joho/godotenv"
 	"robot/bfSocket"
 	"robot/crontab"
 	"robot/policy"
 
-
 	"robot/btApi"
-	//"github.com/davecgh/go-spew/spew"
-	//"github.com/bitfinexcom/bitfinex-api-go/v2"
+
 	"robot/lineBot"
 )
 
@@ -40,8 +27,6 @@ func main() {
 	crontab.Start()
 
 	policy.PolicyInit()
-
-
 
 	notifyChannel := make(chan int)
 
@@ -68,10 +53,10 @@ func submitFunding(notifyChannel <-chan int) {
 		rate, day, err := policy.Policy()
 		log.Printf("Calculate Rate : %v, sign %v", rate, j)
 		if err != nil {
-			log.Fatal("Policy error ",err)
+			log.Printf("Policy error ", err)
+			return
 		}
-		//
-		//fmt.Println("rate:",rate, " day:", day)
+
 		if os.Getenv("AUTO_SUBMIT_FUNDING") == "Y" {
 			for wallet.BalanceAvailable >= 50 {
 				amount := wallet.GetAmount(50)
@@ -83,9 +68,6 @@ func submitFunding(notifyChannel <-chan int) {
 				rate += policy.MyRateController.IncreaseRate
 			}
 
-
 		}
 	}
 }
-
-
