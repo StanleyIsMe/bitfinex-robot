@@ -155,7 +155,7 @@ func TrackMatchPrice() float64 {
 	matchAvg1 := matchedAvg(matchedList[0:100], inValidRate)
 	matchAvg2 := matchedAvg(matchedList, inValidRate)
 	//allAbg := (p0Avg*5+p1Avg*2+p2Avg*1+matchAvg1*1+matchAvg2*8)/17
-	allAbg := (p0Avg + p1Avg + p2Avg*3 + matchAvg1*4 + matchAvg2*2) / 11
+	allAbg := (p0Avg + p1Avg + p2Avg*10 + matchAvg1*1 + matchAvg2*3) / 16
 
 	bottomRate := MyRateController.BottomRate
 	if bottomRate == 0 {

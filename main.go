@@ -23,10 +23,11 @@ func main() {
 	lineBot.LineInit()
 	bfApi.ApiInit()
 	policy.PolicyInit()
+
 	//rate := policy.TrackBookPrice()
 	//rate2 := policy.TrackMatchPrice()
 	//fmt.Println("=================================", rate, rate2)
-	//
+	////
 	//os.Exit(1)
 	bfSocket.SocketInit()
 	crontab.Start()
