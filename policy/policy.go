@@ -1,7 +1,6 @@
 package policy
 
 import (
-	"errors"
 	"os"
 	"strconv"
 	"sync"
@@ -100,22 +99,6 @@ func PolicyInit() {
 
 }
 
-func Policy() (rate float64, day int, err error) {
-	day = 2
-	rate = TrackMatchPrice()
-	if rate <= 0.0002 {
-		return 0, 0, errors.New("計算發生問題")
-	}
-
-	if rate >= MyRateController.CrazyRate {
-		day = 30
-	}
-
-	// 現有金額切幾等分，或者固定多少，或多少天
-
-	return rate, day, nil
-}
-
 func AllocationFunds() {
 
 }
@@ -172,7 +155,7 @@ func TrackMatchPrice() float64 {
 	matchAvg1 := matchedAvg(matchedList[0:100], inValidRate)
 	matchAvg2 := matchedAvg(matchedList, inValidRate)
 	//allAbg := (p0Avg*5+p1Avg*2+p2Avg*1+matchAvg1*1+matchAvg2*8)/17
-	allAbg := (p0Avg + p1Avg + p2Avg + matchAvg1*5 + matchAvg2*2) / 10
+	allAbg := (p0Avg + p1Avg + p2Avg*3 + matchAvg1*4 + matchAvg2*2) / 11
 
 	bottomRate := MyRateController.BottomRate
 	if bottomRate == 0 {

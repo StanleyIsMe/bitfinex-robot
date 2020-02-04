@@ -5,13 +5,13 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/bitfinexcom/bitfinex-api-go/v2"
 	"github.com/joho/godotenv"
 	"robot/bfSocket"
 	"robot/btApi"
 	"robot/crontab"
-	"robot/policy"
-
 	"robot/lineBot"
+	"robot/policy"
 )
 
 func main() {
@@ -22,11 +22,14 @@ func main() {
 
 	lineBot.LineInit()
 	bfApi.ApiInit()
-
+	policy.PolicyInit()
+	//rate := policy.TrackBookPrice()
+	//rate2 := policy.TrackMatchPrice()
+	//fmt.Println("=================================", rate, rate2)
+	//
+	//os.Exit(1)
 	bfSocket.SocketInit()
 	crontab.Start()
-
-	policy.PolicyInit()
 
 	notifyChannel := make(chan int)
 
@@ -50,24 +53,32 @@ func main() {
 func submitFunding(notifyChannel <-chan int) {
 	wallet := policy.NewWallet()
 	for j := range notifyChannel {
-		rate, day, err := policy.Policy()
-		log.Printf("Calculate Rate : %v, sign %v", rate, j)
-		if err != nil {
-			log.Printf("Policy error ", err)
+
+		// 放貸天數
+		day := 2
+		// 計算放貸利率
+		rate := policy.TrackMatchPrice()
+
+		if rate <= 0.0002 {
+			log.Println("計算結果低於: ", rate)
 			return
 		}
+		log.Printf("Calculate Rate : %v, sign %v", rate, j)
 
 		if os.Getenv("AUTO_SUBMIT_FUNDING") == "Y" {
 			for wallet.BalanceAvailable >= 50 {
+				if rate >= policy.MyRateController.CrazyRate {
+					day = 30
+				}
+
 				amount := wallet.GetAmount(50)
-				err := bfApi.SubmitFundingOffer("fUSD", false, amount, rate, int64(day))
+				err := bfApi.SubmitFundingOffer(bitfinex.FundingPrefix+"USD", false, amount, rate, int64(day))
 				if err != nil {
 					lineBot.LineSendMessage(err.Error())
 					break
 				}
 				rate += policy.MyRateController.IncreaseRate
 			}
-
 		}
 	}
 }
