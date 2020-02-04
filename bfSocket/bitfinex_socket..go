@@ -3,6 +3,8 @@ package bfSocket
 import (
 	"log"
 	"os"
+	"time"
+
 	//"sync"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
@@ -21,6 +23,8 @@ func SocketInit() {
 
 	// Enable orderbook checksum verification
 	p.ManageOrderbook = true
+	p.ReconnectAttempts = 999999999
+	p.ReconnectInterval = time.Second * 30
 
 	key := os.Getenv("API_KEY")
 	secret := os.Getenv("API_SEC")
