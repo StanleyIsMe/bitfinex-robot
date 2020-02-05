@@ -1,14 +1,19 @@
 package bfApi
 
 import (
+	"context"
 	"encoding/json"
 	//"github.com/davecgh/go-spew/spew"
 	"fmt"
 	"log"
 	"os"
+	"runtime/debug"
+	"sync"
 	"time"
-	"robot/utils"
+
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
+	"robot/lineBot"
+	"robot/utils"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
 )
@@ -178,6 +183,61 @@ func GetMatched(limit int) ([]*bitfinex.Trade, error){
 	}
 
 	return matchedList.Snapshot, nil
+}
+type LoopOnOffer struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     *sync.WaitGroup
+}
+
+func NewLoopOnOffer() *LoopOnOffer {
+	object := &LoopOnOffer{
+		wg: &sync.WaitGroup{},
+	}
+	object.ctx, object.cancel = context.WithCancel(context.Background())
+	go object.loop()
+	return object
+}
+
+func (object *LoopOnOffer) loop() {
+
+	defer func() {
+		if err := recover(); nil != err {
+			debug.Stack()
+			log.Printf("on offer error : %v", err)
+			object.wg.Done()
+		}
+	}()
+
+	object.wg.Add(1)
+loop:
+	for {
+		select {
+		case <-time.After(1 * time.Minute):
+			now := time.Now().Add(-30 * time.Minute).UnixNano()
+			snap, err := client.Funding.Offers("fUSD")
+			if err != nil {
+				log.Printf("GetOnOfferList error : %v", err)
+			}
+
+			if snap != nil {
+				for _, offer := range snap.Snapshot {
+					if now > offer.MTSCreated {
+						lineBot.LineSendMessage("超過30分鐘未撮合")
+						break
+					}
+				}
+			}
+		case <-object.ctx.Done():
+			break loop
+		}
+	}
+	object.wg.Done()
+}
+
+func (object *LoopOnOffer) ShutDown() {
+	object.cancel()
+	object.wg.Wait()
 }
 
 func SubmitFundingOffer(symbol string, ffr bool, amount float64,rate float64, day int64) error{

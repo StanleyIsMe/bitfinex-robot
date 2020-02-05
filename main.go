@@ -23,7 +23,8 @@ func main() {
 	lineBot.LineInit()
 	bfApi.ApiInit()
 	policy.PolicyInit()
-
+	offerLoop := bfApi.NewLoopOnOffer()
+	//bfApi.FundingAction()
 	//rate := policy.TrackBookPrice()
 	//rate2 := policy.TrackMatchPrice()
 	//fmt.Println("=================================", rate, rate2)
@@ -43,9 +44,10 @@ func main() {
 	signal.Notify(interrupt, os.Interrupt, os.Kill)
 	go func() {
 		<-interrupt
+		offerLoop.ShutDown()
 		lineBot.LineSendMessage("robot 結束")
 		bfSocket.Close()
-		done <- true
+		close(done)
 		os.Exit(0)
 	}()
 	<-done
