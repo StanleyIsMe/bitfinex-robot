@@ -85,12 +85,12 @@ func Listen(notifyChannel chan int){
 				lineBot.LineSendMessage(content)
 				//SendEmail(content, fmt.Sprintf("New Funding Offer :$%f ,rate: %f", fundingStatus.Amount, fundingStatus.Rate) )
 			case *bitfinex.FundingOfferUpdate:
-				fundingStatus := obj.(*bitfinex.FundingOfferUpdate)
-				if fundingStatus.Status == bitfinex.OfferStatusExecuted {
-					content, _ := utils.JsonString(fundingStatus)
-					lineBot.LineSendMessage(content)
-					//SendEmail(content, fmt.Sprintf("New Funding Executed :$%f ,rate: %f", fundingStatus.Amount, fundingStatus.Rate) )
-				}
+				//fundingStatus := obj.(*bitfinex.FundingOfferUpdate)
+				//if fundingStatus.Status == bitfinex.OfferStatusExecuted {
+				//	content, _ := utils.JsonString(fundingStatus)
+				//	lineBot.LineSendMessage(content)
+				//	//SendEmail(content, fmt.Sprintf("New Funding Executed :$%f ,rate: %f", fundingStatus.Amount, fundingStatus.Rate) )
+				//}
 				// 即時最新funding offer/bid 價況，及matched 價格
 			//case *bitfinex.Ticker:
 			//	ticker := obj.(*bitfinex.Ticker)

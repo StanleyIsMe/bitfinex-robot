@@ -23,6 +23,8 @@ func main() {
 	lineBot.LineInit()
 	bfApi.ApiInit()
 	policy.PolicyInit()
+	//bfApi.Test()
+	//os.Exit(1)
 	offerLoop := bfApi.NewLoopOnOffer()
 	//bfApi.FundingAction()
 	//rate := policy.TrackBookPrice()

@@ -214,7 +214,7 @@ loop:
 	for {
 		select {
 		case <-time.After(1 * time.Minute):
-			now := time.Now().Add(-30 * time.Minute).UnixNano()
+			now := time.Now().Add(-30 * time.Minute).Unix()
 			snap, err := client.Funding.Offers("fUSD")
 			if err != nil {
 				log.Printf("GetOnOfferList error : %v", err)
@@ -222,9 +222,15 @@ loop:
 
 			if snap != nil {
 				for _, offer := range snap.Snapshot {
-					if now > offer.MTSCreated {
-						lineBot.LineSendMessage("超過30分鐘未撮合")
-						break
+					if now > (offer.MTSCreated/1000) {
+						_, err := client.Funding.CancelOffer(&bitfinex.FundingOfferCancelRequest{
+							Id: offer.ID,
+						})
+
+						if err != nil {
+							log.Printf("Cancel offer error : %v", offer.ID)
+						}
+						lineBot.LineSendMessage(fmt.Sprintf("單號:%d Rate: %f Day: %d ,..超過30分鐘未撮合", offer.ID, offer.Rate, offer.Period))
 					}
 				}
 			}
