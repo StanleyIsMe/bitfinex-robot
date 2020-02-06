@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
 	"github.com/joho/godotenv"
@@ -57,7 +58,16 @@ func main() {
 
 func submitFunding(notifyChannel <-chan int) {
 	wallet := policy.NewWallet()
+	fixedAmount, err := strconv.ParseFloat(os.Getenv("FUNDING_FIXED_AMOUNT"), 64)
+	if err != nil {
+		log.Fatal("FUNDING_FIXED_AMOUNT error")
+	}
+
 	for j := range notifyChannel {
+
+		if wallet.BalanceAvailable < 50 {
+			continue
+		}
 
 		// 放貸天數
 		day := 2
@@ -76,7 +86,7 @@ func submitFunding(notifyChannel <-chan int) {
 					day = 30
 				}
 
-				amount := wallet.GetAmount(50)
+				amount := wallet.GetAmount(fixedAmount)
 				err := bfApi.SubmitFundingOffer(bitfinex.FundingPrefix+"USD", false, amount, rate, int64(day))
 				if err != nil {
 					lineBot.LineSendMessage(err.Error())

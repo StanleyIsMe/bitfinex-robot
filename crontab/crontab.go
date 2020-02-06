@@ -29,9 +29,10 @@ func Start() {
 		return nil
 	})
 
-	task2 := toolbox.NewTask("機器人檢查", "0 */30 * * * *", func() error {
+	task2 := toolbox.NewTask("機器人檢查", "0 0 */3 * * *", func() error {
 		// work
-		lineBot.LineSendMessage("我還在工作唷")
+		//lineBot.LineSendMessage("我還在工作唷")
+		utils.SendEmail("工作中", "robot on working")
 		return nil
 	})
 	toolbox.AddTask("放貸收穫", task1)

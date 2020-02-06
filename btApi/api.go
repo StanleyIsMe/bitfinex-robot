@@ -214,7 +214,7 @@ loop:
 	for {
 		select {
 		case <-time.After(1 * time.Minute):
-			now := time.Now().Add(-30 * time.Minute).Unix()
+			now := time.Now().Add(-15 * time.Minute).Unix()
 			snap, err := client.Funding.Offers("fUSD")
 			if err != nil {
 				log.Printf("GetOnOfferList error : %v", err)

@@ -66,14 +66,15 @@ func (object *Wallet) Update(balance, balanceAvailable float64) {
 	object.Unlock()
 }
 
-func (object *Wallet) GetAmount(basicAmount float64) (amount float64) {
-	amount = basicAmount
+func (object *Wallet) GetAmount(basicAmount float64) float64 {
+	minimumAmount := 50.0
 	object.Lock()
 	defer object.Unlock()
-	if object.BalanceAvailable >= 50 && object.BalanceAvailable < 100 {
-		amount = object.BalanceAvailable
+
+	if ((object.BalanceAvailable-basicAmount) < minimumAmount ) || (object.BalanceAvailable <= basicAmount) {
+		temp := object.BalanceAvailable
 		object.BalanceAvailable = 0
-		return amount
+		return temp
 	}
 	object.BalanceAvailable -= basicAmount
 	return basicAmount

@@ -9,8 +9,6 @@ import (
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
 	"robot/policy"
-	"robot/utils"
-
 	//"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
 	"github.com/bitfinexcom/bitfinex-api-go/v2/websocket"
 	"robot/lineBot"
@@ -73,16 +71,16 @@ func Listen(notifyChannel chan int){
 				walletStatus := obj.(*bitfinex.WalletUpdate)
 				if walletStatus.BalanceAvailable >= 50 && walletStatus.Type == "funding"{
 					wallet.Update(walletStatus.Balance, walletStatus.BalanceAvailable)
-					content, _ := utils.JsonString(walletStatus)
-					lineBot.LineSendMessage(content)
+					//content, _ := utils.JsonString(walletStatus)
+					//lineBot.LineSendMessage(content)
 					notifyChannel<-1
 					//SendEmail(content, "wallet status")
 				}
 
 			case *bitfinex.FundingOfferNew:
-				fundingStatus := obj.(*bitfinex.FundingOfferNew)
-				content, _ := utils.JsonString(fundingStatus)
-				lineBot.LineSendMessage(content)
+				//fundingStatus := obj.(*bitfinex.FundingOfferNew)
+				//content, _ := utils.JsonString(fundingStatus)
+				//lineBot.LineSendMessage(content)
 				//SendEmail(content, fmt.Sprintf("New Funding Offer :$%f ,rate: %f", fundingStatus.Amount, fundingStatus.Rate) )
 			case *bitfinex.FundingOfferUpdate:
 				//fundingStatus := obj.(*bitfinex.FundingOfferUpdate)
@@ -103,9 +101,9 @@ func Listen(notifyChannel chan int){
 			//	//lineBot.LineSendMessage(content)
 				// 個人funding 交易 即時狀況
 			case *bitfinex.FundingTrade:
-				fundingTrade := obj.(*bitfinex.FundingTrade)
-				content, _ := utils.JsonString(fundingTrade)
-				lineBot.LineSendMessage(content)
+				//fundingTrade := obj.(*bitfinex.FundingTrade)
+				//content, _ := utils.JsonString(fundingTrade)
+				//lineBot.LineSendMessage(content)
 
 			default:
 				//utils.PrintWithStruct(obj)
