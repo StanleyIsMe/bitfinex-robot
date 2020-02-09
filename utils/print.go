@@ -8,7 +8,7 @@ import (
 )
 
 func JsonString(val interface{}) (string, error) {
-	json, err := json.Marshal(val)
+	json, err := json.MarshalIndent(val, "", "\t")
 	if err != nil {
 		log.Fatal("Failed to generate json", err)
 		return "", err

@@ -131,10 +131,7 @@ func TickerAction() {
 }
 
 // 每日funding offer 利息獲得及總資產
-func GetLedgers() []*bitfinex.Ledger{
-	now:= time.Now()
-	end := now.UnixNano()/ int64(time.Millisecond)
-
+func GetLedgers(end int64) []*bitfinex.Ledger{
 	result, err := client.Ledgers.Ledgers("USD", 0, end, 500)
 	if err != nil {
 		log.Printf("getting Ledgers: %s", err)

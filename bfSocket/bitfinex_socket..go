@@ -134,7 +134,10 @@ func Listen(notifyChannel chan int){
 	}()
 }
 
+func IsConnected() bool {
+	return socket.IsConnected()
+}
+
 func Close() {
 	socket.Close()
-
 }

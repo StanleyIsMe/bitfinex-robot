@@ -117,11 +117,11 @@ func TrackBookPrice() float64 {
 	}
 
 	// 算市場平均價
-	p0Avg := bookAvg(offerListP0, inValidRate)
-	p1Avg := bookAvg(offerListP1, inValidRate)
-	p2Avg := bookAvg(offerListP2, inValidRate)
-	matchAvg1 := matchedAvg(matchedList[0:100], inValidRate)
-	matchAvg2 := matchedAvg(matchedList, inValidRate)
+	p0Avg := excueBookAvg(offerListP0, inValidRate)
+	p1Avg := excueBookAvg(offerListP1, inValidRate)
+	p2Avg := excueBookAvg(offerListP2, inValidRate)
+	matchAvg1 := excueMatchedAvg(matchedList[0:100], inValidRate)
+	matchAvg2 := excueMatchedAvg(matchedList, inValidRate)
 	//allAbg := (p0Avg*5+p1Avg*2+p2Avg*1+matchAvg1*1+matchAvg2*8)/17
 	allAbg := (p0Avg + p1Avg + p2Avg + matchAvg1 + matchAvg2) / 5
 
@@ -150,31 +150,33 @@ func TrackMatchPrice() float64 {
 	}
 
 	// 算市場平均價
-	p0Avg := bookAvg(offerListP0, inValidRate)
-	p1Avg := bookAvg(offerListP1, inValidRate)
-	p2Avg := bookAvg(offerListP2, inValidRate)
-	matchAvg1 := matchedAvg(matchedList[0:100], inValidRate)
-	matchAvg2 := matchedAvg(matchedList, inValidRate)
+	p0Avg := excueBookAvg(offerListP0, inValidRate)
+	p1Avg := excueBookAvg(offerListP1, inValidRate)
+	p2Avg := excueBookAvg(offerListP2, inValidRate)
+	matchAvg1 := excueMatchedAvg(matchedList[0:100], inValidRate)
+	matchAvg2 := excueMatchedAvg(matchedList, inValidRate)
 	//allAbg := (p0Avg*5+p1Avg*2+p2Avg*1+matchAvg1*1+matchAvg2*8)/17
-	allAbg := (p0Avg + p1Avg + p2Avg*10 + matchAvg1*1 + matchAvg2*3) / 16
+	allAvg := (p0Avg + p1Avg + p2Avg*10 + matchAvg1*1 + matchAvg2*3) / 16
 
+	// 假如沒設定最小利率，則以市場最高出價利率當作最低
 	bottomRate := MyRateController.BottomRate
 	if bottomRate == 0 {
 		bottomRate = bidListP0[0].Price
 	}
 
-	if bottomRate > allAbg && bottomRate > matchAvg1 {
+	if bottomRate > allAvg && bottomRate > matchAvg1 {
 		return bottomRate
 	}
 
-	if allAbg <  matchAvg1 {
+	// 假如算出比近期平均成交利率還低，就以平均成交利率為主
+	if allAvg <  matchAvg1 {
 		return matchAvg1
 	}
 
-	return allAbg
+	return allAvg
 }
 
-func bookAvg(list []*bitfinex.BookUpdate, inValidRate float64) (average float64) {
+func excueBookAvg(list []*bitfinex.BookUpdate, inValidRate float64) (average float64) {
 	var count float64
 	for _, data := range list {
 		if data.Price > inValidRate {
@@ -185,7 +187,7 @@ func bookAvg(list []*bitfinex.BookUpdate, inValidRate float64) (average float64)
 	return average / count
 }
 
-func matchedAvg(list []*bitfinex.Trade, inValidRate float64) (average float64) {
+func excueMatchedAvg(list []*bitfinex.Trade, inValidRate float64) (average float64) {
 	var count float64
 	for _, data := range list {
 		if data.Price > inValidRate {
