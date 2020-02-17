@@ -68,11 +68,14 @@ func Listen() {
 			switch update.Message.Text {
 			case "open":
 				msg.ReplyMarkup = numericKeyboard
+				break
 			case "close":
 				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+				break
 			case "config":
 				content, _ := utils.JsonString(config)
 				msg.Text = content
+				break
 			default:
 				key, val := parseText(update.Message.Text)
 				msg.Text = ReplyAction(key, val)

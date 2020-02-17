@@ -10,6 +10,7 @@ import (
 	"github.com/astaxie/beego/toolbox"
 	"robot/bfSocket"
 	bfApi "robot/btApi"
+	"robot/telegramBot"
 	"robot/utils"
 )
 type DailyInterestReport struct {
@@ -54,6 +55,7 @@ func Start() {
 
 		content, _ := utils.JsonString(report)
 		utils.SendEmail(content, "利息日報")
+		telegramBot.ServerMessage(content)
 		log.Print("Daily Interest Report Is Done")
 		//content, _ := utils.JsonString(earnInfoList)
 		//lineBot.LineSendMessage(content)
@@ -63,7 +65,8 @@ func Start() {
 	task2 := toolbox.NewTask("機器人檢查", "0 0 */4 * * *", func() error {
 		// work
 		//lineBot.LineSendMessage("我還在工作唷")
-		utils.SendEmail("我有在工作拉 請放心", "Robot on working")
+		//utils.SendEmail("我有在工作拉 請放心", "Robot on working")
+		telegramBot.ServerMessage("我有在工作拉 請放心")
 		return nil
 	})
 
