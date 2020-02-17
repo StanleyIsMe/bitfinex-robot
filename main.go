@@ -1,18 +1,22 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
+	"syscall"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"robot/bfSocket"
 	"robot/btApi"
+	"robot/config_manage"
 	"robot/crontab"
-	"robot/lineBot"
 	"robot/policy"
+	"robot/telegramBot"
 )
 
 func main() {
@@ -21,34 +25,50 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	lineBot.LineInit()
+	config_manage.NewConfig()
+	policy.InitPolicy()
+	telegramBot.BotInit()
+	telegramBot.Listen()
 	bfApi.ApiInit()
-	policy.PolicyInit()
-	//bfApi.Test()
-	//os.Exit(1)
-	offerLoop := bfApi.NewLoopOnOffer()
-	//bfApi.FundingAction()
-	//rate := policy.TrackBookPrice()
-	//rate2 := policy.TrackMatchPrice()
-	//fmt.Println("=================================", rate, rate2)
-	////
-	//os.Exit(1)
 	bfSocket.SocketInit()
 	crontab.Start()
 
-	notifyChannel := make(chan int)
+	// 監聽超過15分鐘未matched的單
+	offerLoop := bfApi.NewLoopOnOffer()
 
+	notifyChannel := make(chan int)
 	go submitFunding(notifyChannel)
 	bfSocket.Listen(notifyChannel)
+
+	router := gin.Default()
+	router.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "deploy ok",
+		})
+	})
+
+	srv := &http.Server{
+		Addr:    ":" + os.Getenv("PORT"),
+		Handler: router,
+	}
+
+	go func() {
+		// service connections
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
 
 	//os.Exit(0)
 	done := make(chan bool, 1)
 	interrupt := make(chan os.Signal)
-	signal.Notify(interrupt, os.Interrupt, os.Kill)
+	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGTERM)
 	go func() {
 		<-interrupt
+		telegramBot.ServerMessage("Robot Close")
+		srv.Close()
+		telegramBot.Close()
 		offerLoop.ShutDown()
-		lineBot.LineSendMessage("robot 結束")
 		bfSocket.Close()
 		close(done)
 		os.Exit(0)
@@ -58,10 +78,8 @@ func main() {
 
 func submitFunding(notifyChannel <-chan int) {
 	wallet := policy.NewWallet()
-	fixedAmount, err := strconv.ParseFloat(os.Getenv("FUNDING_FIXED_AMOUNT"), 64)
-	if err != nil {
-		log.Fatal("FUNDING_FIXED_AMOUNT error")
-	}
+
+	config := config_manage.NewConfig()
 
 	for j := range notifyChannel {
 
@@ -70,9 +88,10 @@ func submitFunding(notifyChannel <-chan int) {
 		}
 
 		// 放貸天數
-		day := 2
+		day := config.GetDay()
 		// 計算放貸利率
-		rate := policy.TrackMatchPrice()
+		//rate := policy.TrackMatchPrice()
+		rate := config.Policy()
 
 		if rate <= 0.0002 {
 			log.Println("計算結果低於: ", rate)
@@ -80,19 +99,19 @@ func submitFunding(notifyChannel <-chan int) {
 		}
 		log.Printf("Calculate Rate : %v, sign %v", rate, j)
 
-		if os.Getenv("AUTO_SUBMIT_FUNDING") == "Y" {
+		if config.GetSubmitOffer() {
 			for wallet.BalanceAvailable >= 50 {
-				if rate >= policy.MyRateController.CrazyRate {
+				if rate >= config.GetCrazyRate() {
 					day = 30
 				}
-
+				fixedAmount := config.GetFixedAmount()
 				amount := wallet.GetAmount(fixedAmount)
 				err := bfApi.SubmitFundingOffer(bitfinex.FundingPrefix+"USD", false, amount, rate, int64(day))
 				if err != nil {
-					lineBot.LineSendMessage(err.Error())
+					telegramBot.ServerMessage(fmt.Sprintf("Submit Offer Error: %v", err))
 					break
 				}
-				rate += policy.MyRateController.IncreaseRate
+				rate += config.GetIncreaseRate()
 			}
 		}
 	}

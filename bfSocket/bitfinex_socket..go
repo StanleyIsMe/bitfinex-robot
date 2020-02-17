@@ -11,7 +11,6 @@ import (
 	"robot/policy"
 	//"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
 	"github.com/bitfinexcom/bitfinex-api-go/v2/websocket"
-	"robot/lineBot"
 )
 
 var socket *websocket.Client
@@ -65,7 +64,7 @@ func Listen(notifyChannel chan int){
 			switch obj.(type) {
 			case error:
 				log.Printf("Socket error: %v", obj.(error))
-				lineBot.LineSendMessage("Socket error")
+				//lineBot.LineSendMessage("Socket error")
 				//utils.SendEmail(fmt.Sprintf("channel closed: %s", obj), "robot socket error")
 			case *bitfinex.WalletUpdate:
 				walletStatus := obj.(*bitfinex.WalletUpdate)

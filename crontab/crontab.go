@@ -1,7 +1,9 @@
 package crontab
 
 import (
+	"io/ioutil"
 	"log"
+	"net/http"
 	"time"
 
 
@@ -17,8 +19,8 @@ type DailyInterestReport struct {
 }
 
 func Start() {
-	// 每天09:30:30 Am
-	task1 := toolbox.NewTask("放貸收穫", "20 30 9 * * *", func() error {
+	// 每天09:31:0 Am
+	task1 := toolbox.NewTask("放貸收穫", "0 35 9 * * *", func() error {
 		// work
 		report := &DailyInterestReport{}
 
@@ -73,9 +75,25 @@ func Start() {
 		return nil
 	})
 
+	task4 := toolbox.NewTask("Prevent Heroku Sleep", "0 */10 * * * *", func() error {
+		log.Println("Heroku Wake Up")
+		res, err := http.Get("https://bf-robot.herokuapp.com/")
+		if err != nil {
+			log.Println(err)
+		}
+		defer res.Body.Close()
+		sitemap, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			log.Println(err)
+		}
+		log.Printf("%s", sitemap)
+		return nil
+	})
+
 	toolbox.AddTask("放貸收穫", task1)
 	toolbox.AddTask("機器人檢查", task2)
 	toolbox.AddTask("Bitfinex socket validator", task3)
+	toolbox.AddTask("Prevent Heroku Sleep", task4)
 
 	toolbox.StartTask()
 }

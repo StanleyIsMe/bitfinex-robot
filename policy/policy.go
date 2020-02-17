@@ -1,35 +1,21 @@
 package policy
 
 import (
-	"os"
-	"strconv"
+	"log"
 	"sync"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
 	"robot/btApi"
+	"robot/config_manage"
 )
 
-type CalculateRate struct {
-	MatchedList []*bitfinex.Trade      // 最近成交價
-	BookListP0  []*bitfinex.BookUpdate //
-	BookListP1  []*bitfinex.BookUpdate
-	BookListP2  []*bitfinex.BookUpdate
-}
+//type CalculateRate struct {
+//	MatchedList []*bitfinex.Trade      // 最近成交價
+//	BookListP0  []*bitfinex.BookUpdate //
+//	BookListP1  []*bitfinex.BookUpdate
+//	BookListP2  []*bitfinex.BookUpdate
+//}
 
-type RateControl struct {
-	TopRate      float64
-	BottomRate   float64
-	FixedAmount  float64
-	Day          int
-	CrazyRate    float64
-	NormalRate   float64
-	IncreaseRate float64
-}
-
-type FundingInfo struct {
-	Loaned  []int
-	Lending []int
-}
 
 type Wallet struct {
 	sync.RWMutex
@@ -39,9 +25,7 @@ type Wallet struct {
 	wg               *sync.WaitGroup
 }
 
-var MyRateController *RateControl
 var myWallet *Wallet
-var MyOnFunding []int
 
 func NewWallet() *Wallet {
 	var once sync.Once
@@ -80,31 +64,14 @@ func (object *Wallet) GetAmount(basicAmount float64) float64 {
 	return basicAmount
 }
 
-func PolicyInit() {
-	bottomRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_BOTTOM_RATE"), 64)
-	topRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_TOP_RATE"), 64)
-	crazyRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_CRAZY_RATE"), 64)
-	normalRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_NORMAL_RATE"), 64)
-	fixedAmount, _ := strconv.ParseFloat(os.Getenv("FUNDING_FIXED_AMOUNT"), 64)
-	increaseRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_INCREASE_RATE"), 64)
-
-	MyRateController = &RateControl{
-		TopRate:      topRate,
-		BottomRate:   bottomRate,
-		FixedAmount:  fixedAmount,
-		Day:          2,
-		CrazyRate:    crazyRate,
-		NormalRate:   normalRate,
-		IncreaseRate: increaseRate,
-	}
-
+func InitPolicy(){
+	config := config_manage.NewConfig()
+	config.Policy = TrackMatchPrice
 }
-
-func AllocationFunds() {
-
-}
-
 func TrackBookPrice() float64 {
+	log.Println("Use TrackBookPrice Policy")
+	config := config_manage.NewConfig()
+
 	// 無效值先隨意暫定
 	inValidRate := 0.0003
 
@@ -125,7 +92,7 @@ func TrackBookPrice() float64 {
 	//allAbg := (p0Avg*5+p1Avg*2+p2Avg*1+matchAvg1*1+matchAvg2*8)/17
 	allAbg := (p0Avg + p1Avg + p2Avg + matchAvg1 + matchAvg2) / 5
 
-	bottomRate := MyRateController.BottomRate
+	bottomRate := config.GetBottomRate()
 	if bottomRate == 0 {
 		bottomRate = bidListP0[0].Price
 	}
@@ -138,6 +105,8 @@ func TrackBookPrice() float64 {
 }
 
 func TrackMatchPrice() float64 {
+	log.Println("Use TrackMatchPrice Policy")
+	config := config_manage.NewConfig()
 	// 無效值先隨意暫定
 	inValidRate := 0.0003
 
@@ -159,7 +128,7 @@ func TrackMatchPrice() float64 {
 	allAvg := (p0Avg + p1Avg + p2Avg*10 + matchAvg1*1 + matchAvg2*3) / 16
 
 	// 假如沒設定最小利率，則以市場最高出價利率當作最低
-	bottomRate := MyRateController.BottomRate
+	bottomRate := config.GetBottomRate()
 	if bottomRate == 0 {
 		bottomRate = bidListP0[0].Price
 	}

@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
-	"robot/lineBot"
+	"robot/config_manage"
+	"robot/telegramBot"
 	"robot/utils"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
@@ -185,6 +186,8 @@ type LoopOnOffer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     *sync.WaitGroup
+
+	UnMatchedCount int
 }
 
 func NewLoopOnOffer() *LoopOnOffer {
@@ -205,13 +208,20 @@ func (object *LoopOnOffer) loop() {
 			object.wg.Done()
 		}
 	}()
-
+	config := config_manage.NewConfig()
 	object.wg.Add(1)
 loop:
 	for {
 		select {
 		case <-time.After(1 * time.Minute):
-			now := time.Now().Add(-15 * time.Minute).Unix()
+			now := time.Now()
+
+			// 每日歸零
+			if now.Hour() == 0 && now.Minute() == 0 {
+				object.UnMatchedCount = 0
+			}
+
+			lastFifteenMinute := now.Add(-15 * time.Minute).Unix()
 			snap, err := client.Funding.Offers("fUSD")
 			if err != nil {
 				log.Printf("GetOnOfferList error : %v", err)
@@ -219,7 +229,7 @@ loop:
 
 			if snap != nil {
 				for _, offer := range snap.Snapshot {
-					if now > (offer.MTSCreated/1000) {
+					if lastFifteenMinute > (offer.MTSCreated/1000) {
 						_, err := client.Funding.CancelOffer(&bitfinex.FundingOfferCancelRequest{
 							Id: offer.ID,
 						})
@@ -227,7 +237,8 @@ loop:
 						if err != nil {
 							log.Printf("Cancel offer error : %v", offer.ID)
 						}
-						lineBot.LineSendMessage(fmt.Sprintf("單號:%d Rate: %f Day: %d ,..超過30分鐘未撮合", offer.ID, offer.Rate, offer.Period))
+						telegramBot.SendMessage(config.TelegramId, fmt.Sprintf("單號:%d Rate: %f Day: %d ,..超過15分鐘未撮合, 今日已累積未搓合次數:%d", offer.ID, offer.Rate, offer.Period, object.UnMatchedCount))
+						object.UnMatchedCount++
 					}
 				}
 			}
