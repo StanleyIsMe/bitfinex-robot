@@ -65,8 +65,8 @@ func (object *Wallet) GetAmount(basicAmount float64) float64 {
 }
 
 func InitPolicy(){
-	config := config_manage.NewConfig()
-	config.Policy = TrackMatchPrice
+	//config := config_manage.NewConfig()
+	//config.Policy = TrackMatchPrice
 }
 func TrackBookPrice() float64 {
 	log.Println("Use TrackBookPrice Policy")

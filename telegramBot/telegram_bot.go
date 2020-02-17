@@ -1,6 +1,7 @@
 package telegramBot
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -63,7 +64,7 @@ func Listen() {
 				continue
 			}
 
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 
 			switch update.Message.Text {
 			case "open":
@@ -77,13 +78,17 @@ func Listen() {
 				msg.Text = content
 				break
 			default:
+				fmt.Println("In default")
 				key, val := parseText(update.Message.Text)
 				msg.Text = ReplyAction(key, val)
+			}
+
+			if msg.Text == "" {
 				continue
 			}
 
 			if _, err := bot.Send(msg); err != nil {
-				log.Panic(err)
+				log.Printf("Response Telegram Reply Error : %v", err)
 			}
 		}
 	}()

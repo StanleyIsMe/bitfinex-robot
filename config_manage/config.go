@@ -16,7 +16,7 @@ type ConfigManage struct {
 	IncreaseRate float64 `json:"遞增利率"`
 	TelegramId   int64
 	SubmitOffer  bool `json:"自動放貸"`
-	Policy func()float64
+	//Policy func()float64
 }
 
 var config *ConfigManage

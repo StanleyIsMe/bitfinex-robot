@@ -11,7 +11,6 @@ import (
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"robot/bfSocket"
 	"robot/btApi"
 	"robot/config_manage"
 	"robot/crontab"
@@ -30,7 +29,7 @@ func main() {
 	telegramBot.BotInit()
 	telegramBot.Listen()
 	bfApi.ApiInit()
-	bfSocket.SocketInit()
+	//bfSocket.SocketInit()
 	crontab.Start()
 
 	// 監聽超過15分鐘未matched的單
@@ -38,7 +37,7 @@ func main() {
 
 	notifyChannel := make(chan int)
 	go submitFunding(notifyChannel)
-	bfSocket.Listen(notifyChannel)
+	//bfSocket.Listen(notifyChannel)
 
 	router := gin.Default()
 	router.GET("/", func(c *gin.Context) {
@@ -69,7 +68,7 @@ func main() {
 		srv.Close()
 		telegramBot.Close()
 		offerLoop.ShutDown()
-		bfSocket.Close()
+		//bfSocket.Close()
 		close(done)
 		os.Exit(0)
 	}()
@@ -90,8 +89,8 @@ func submitFunding(notifyChannel <-chan int) {
 		// 放貸天數
 		day := config.GetDay()
 		// 計算放貸利率
-		//rate := policy.TrackMatchPrice()
-		rate := config.Policy()
+		rate := policy.TrackMatchPrice()
+		//rate := config.Policy()
 
 		if rate <= 0.0002 {
 			log.Println("計算結果低於: ", rate)
