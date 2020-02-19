@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/astaxie/beego/toolbox"
+	"robot/bfApi"
 	"robot/bfSocket"
 	"robot/logger"
 	"robot/telegramBot"
@@ -62,6 +63,7 @@ func Start() {
 		// work
 		//lineBot.LineSendMessage("我還在工作唷")
 		//utils.SendEmail("我有在工作拉 請放心", "Robot on working")
+		bfApi.ApiInit()
 		telegramBot.ServerMessage("我有在工作拉 請放心")
 		return nil
 	})

@@ -214,7 +214,7 @@ func GetInterestInfo() string {
 			end = data.MTS
 		}
 
-		list = bfApi.GetLedgers(end)
+		list = bfApi.GetLedgers(end-1)
 	}
 
 
