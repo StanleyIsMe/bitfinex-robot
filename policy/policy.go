@@ -5,17 +5,9 @@ import (
 	"sync"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
-	"robot/btApi"
+	"robot/bfApi"
 	"robot/config_manage"
 )
-
-//type CalculateRate struct {
-//	MatchedList []*bitfinex.Trade      // 最近成交價
-//	BookListP0  []*bitfinex.BookUpdate //
-//	BookListP1  []*bitfinex.BookUpdate
-//	BookListP2  []*bitfinex.BookUpdate
-//}
-
 
 type Wallet struct {
 	sync.RWMutex
@@ -55,7 +47,7 @@ func (object *Wallet) GetAmount(basicAmount float64) float64 {
 	object.Lock()
 	defer object.Unlock()
 
-	if ((object.BalanceAvailable-basicAmount) < minimumAmount ) || (object.BalanceAvailable <= basicAmount) {
+	if ((object.BalanceAvailable - basicAmount) < minimumAmount) || (object.BalanceAvailable <= basicAmount) {
 		temp := object.BalanceAvailable
 		object.BalanceAvailable = 0
 		return temp
@@ -64,49 +56,14 @@ func (object *Wallet) GetAmount(basicAmount float64) float64 {
 	return basicAmount
 }
 
-func InitPolicy(){
+func InitPolicy() {
 	//config := config_manage.NewConfig()
 	//config.Policy = TrackMatchPrice
-}
-func TrackBookPrice() float64 {
-	log.Println("Use TrackBookPrice Policy")
-	config := config_manage.NewConfig()
-
-	// 無效值先隨意暫定
-	inValidRate := 0.0003
-
-	bidListP0, offerListP0, err0 := bfApi.GetBook(bitfinex.Precision0)
-	_, offerListP1, err1 := bfApi.GetBook(bitfinex.Precision1)
-	_, offerListP2, err2 := bfApi.GetBook(bitfinex.Precision2)
-	matchedList, err := bfApi.GetMatched(10000)
-	if err != nil || err0 != nil || err1 != nil || err2 != nil {
-		return 0
-	}
-
-	// 算市場平均價
-	p0Avg := excueBookAvg(offerListP0, inValidRate)
-	p1Avg := excueBookAvg(offerListP1, inValidRate)
-	p2Avg := excueBookAvg(offerListP2, inValidRate)
-	matchAvg1 := excueMatchedAvg(matchedList[0:100], inValidRate)
-	matchAvg2 := excueMatchedAvg(matchedList, inValidRate)
-	//allAbg := (p0Avg*5+p1Avg*2+p2Avg*1+matchAvg1*1+matchAvg2*8)/17
-	allAbg := (p0Avg + p1Avg + p2Avg + matchAvg1 + matchAvg2) / 5
-
-	bottomRate := config.GetBottomRate()
-	if bottomRate == 0 {
-		bottomRate = bidListP0[0].Price
-	}
-
-	if allAbg < bottomRate {
-		return bottomRate
-	}
-
-	return allAbg
 }
 
 func TrackMatchPrice() float64 {
 	log.Println("Use TrackMatchPrice Policy")
-	config := config_manage.NewConfig()
+
 	// 無效值先隨意暫定
 	inValidRate := 0.0003
 
@@ -124,11 +81,39 @@ func TrackMatchPrice() float64 {
 	p2Avg := excueBookAvg(offerListP2, inValidRate)
 	matchAvg1 := excueMatchedAvg(matchedList[0:100], inValidRate)
 	matchAvg2 := excueMatchedAvg(matchedList, inValidRate)
-	//allAbg := (p0Avg*5+p1Avg*2+p2Avg*1+matchAvg1*1+matchAvg2*8)/17
-	allAvg := (p0Avg + p1Avg + p2Avg*10 + matchAvg1*1 + matchAvg2*3) / 16
+
+	weights := config_manage.Config.GetWeights()
+	var allAvg float64
+	total := 0
+	for key, weight := range weights {
+		switch key {
+		case "book01":
+			allAvg += p0Avg * float64(weight)
+			total += weight
+			break
+		case "book02":
+			allAvg += p1Avg * float64(weight)
+			total += weight
+			break
+		case "book03":
+			allAvg += p2Avg * float64(weight)
+			total += weight
+			break
+		case "avg100":
+			allAvg += matchAvg1 * float64(weight)
+			total += weight
+			break
+		case "avg10000":
+			allAvg += matchAvg2 * float64(weight)
+			total += weight
+			break
+
+		}
+	}
+	allAvg = allAvg / float64(total)
 
 	// 假如沒設定最小利率，則以市場最高出價利率當作最低
-	bottomRate := config.GetBottomRate()
+	bottomRate := config_manage.Config.GetBottomRate()
 	if bottomRate == 0 {
 		bottomRate = bidListP0[0].Price
 	}
@@ -138,7 +123,7 @@ func TrackMatchPrice() float64 {
 	}
 
 	// 假如算出比近期平均成交利率還低，就以平均成交利率為主
-	if allAvg <  matchAvg1 {
+	if allAvg < matchAvg1 {
 		return matchAvg1
 	}
 

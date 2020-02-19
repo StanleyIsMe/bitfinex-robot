@@ -16,14 +16,16 @@ type ConfigManage struct {
 	IncreaseRate float64 `json:"遞增利率"`
 	TelegramId   int64
 	SubmitOffer  bool `json:"自動放貸"`
-	//Policy func()float64
+	InValidRate float64 `json:"無效利率"`
+	Weights map[string]int `json:"利率計算權重"`
+	//Policy func()float64 `json:"-"`
 }
 
-var config *ConfigManage
+var Config *ConfigManage
 func NewConfig() *ConfigManage {
 	var once sync.Once
 
-	if config == nil {
+	if Config == nil {
 		once.Do(func() {
 
 			bottomRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_BOTTOM_RATE"), 64)
@@ -33,7 +35,7 @@ func NewConfig() *ConfigManage {
 			telegramId, _ := strconv.ParseInt(os.Getenv("TELEGRAM_MANAGE_ID"), 10, 64)
 			submitOffer := os.Getenv("AUTO_SUBMIT_FUNDING") == "Y"
 
-			config = &ConfigManage{
+			Config = &ConfigManage{
 				RWMutex:      sync.RWMutex{},
 				BottomRate:   bottomRate,
 				FixedAmount:  fixedAmount,
@@ -42,12 +44,20 @@ func NewConfig() *ConfigManage {
 				IncreaseRate: increaseRate,
 				TelegramId:   telegramId,
 				SubmitOffer:  submitOffer,
+				InValidRate: 0.0003,
+				Weights: map[string]int{
+					"book01":1,
+					"book02":1,
+					"book03":10,
+					"avg100":1,
+					"avg10000":3,
+				},
 			}
 		})
 	}
 
 
-	return config
+	return Config
 }
 
 func (config *ConfigManage) GetBottomRate() float64 {
@@ -86,6 +96,12 @@ func (config *ConfigManage) GetSubmitOffer() bool {
 	return config.SubmitOffer
 }
 
+func (config *ConfigManage) GetWeights() map[string]int {
+	config.Lock()
+	defer config.Unlock()
+	return config.Weights
+}
+
 func (config *ConfigManage) SetBottomRate(rate float64) {
 	config.Lock()
 	defer config.Unlock()
@@ -120,4 +136,26 @@ func (config *ConfigManage) SetSubmitOffer(submit bool) {
 	config.Lock()
 	defer config.Unlock()
 	config.SubmitOffer = submit
+}
+
+func (config *ConfigManage) SetWeights(key string, increment int) {
+	config.Lock()
+	defer config.Unlock()
+	val, ok := config.Weights[key]
+	if ok && (val+increment) > 0 {
+		config.Weights[key] += increment
+	}
+}
+
+// 權重初始化
+func (config *ConfigManage) WeightsInit() {
+	config.Lock()
+	defer config.Unlock()
+	config.Weights = map[string]int{
+		"book01":1,
+		"book02":1,
+		"book03":10,
+		"avg100":1,
+		"avg10000":3,
+	}
 }

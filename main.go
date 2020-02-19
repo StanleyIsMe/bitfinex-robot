@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,9 +10,12 @@ import (
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"robot/btApi"
+	"robot/bfApi"
+	"robot/bfSocket"
 	"robot/config_manage"
 	"robot/crontab"
+	"robot/logger"
+	"robot/loop"
 	"robot/policy"
 	"robot/telegramBot"
 )
@@ -25,19 +27,20 @@ func main() {
 	}
 
 	config_manage.NewConfig()
+	logger.InitLogger()
 	policy.InitPolicy()
 	telegramBot.BotInit()
 	telegramBot.Listen()
 	bfApi.ApiInit()
-	//bfSocket.SocketInit()
+	bfSocket.SocketInit()
 	crontab.Start()
 
 	// 監聽超過15分鐘未matched的單
-	offerLoop := bfApi.NewLoopOnOffer()
+	offerLoop := loop.NewLoopOnOffer()
 
 	notifyChannel := make(chan int)
 	go submitFunding(notifyChannel)
-	//bfSocket.Listen(notifyChannel)
+	bfSocket.Listen(notifyChannel)
 
 	router := gin.Default()
 	router.GET("/", func(c *gin.Context) {
@@ -54,7 +57,7 @@ func main() {
 	go func() {
 		// service connections
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
+			logger.LOG.Errorf("listen: %s\n", err)
 		}
 	}()
 
@@ -68,7 +71,7 @@ func main() {
 		srv.Close()
 		telegramBot.Close()
 		offerLoop.ShutDown()
-		//bfSocket.Close()
+		bfSocket.Close()
 		close(done)
 		os.Exit(0)
 	}()
@@ -78,8 +81,6 @@ func main() {
 func submitFunding(notifyChannel <-chan int) {
 	wallet := policy.NewWallet()
 
-	config := config_manage.NewConfig()
-
 	for j := range notifyChannel {
 
 		if wallet.BalanceAvailable < 50 {
@@ -87,30 +88,29 @@ func submitFunding(notifyChannel <-chan int) {
 		}
 
 		// 放貸天數
-		day := config.GetDay()
+		day := config_manage.Config.GetDay()
 		// 計算放貸利率
 		rate := policy.TrackMatchPrice()
-		//rate := config.Policy()
 
-		if rate <= 0.0002 {
+		if rate <= config_manage.Config.InValidRate {
 			log.Println("計算結果低於: ", rate)
 			return
 		}
-		log.Printf("Calculate Rate : %v, sign %v", rate, j)
+		logger.LOG.Infof("Calculate Rate : %v, sign %v", rate, j)
 
-		if config.GetSubmitOffer() {
+		if config_manage.Config.GetSubmitOffer() {
 			for wallet.BalanceAvailable >= 50 {
-				if rate >= config.GetCrazyRate() {
+				if rate >= config_manage.Config.GetCrazyRate() {
 					day = 30
 				}
-				fixedAmount := config.GetFixedAmount()
+				fixedAmount := config_manage.Config.GetFixedAmount()
 				amount := wallet.GetAmount(fixedAmount)
 				err := bfApi.SubmitFundingOffer(bitfinex.FundingPrefix+"USD", false, amount, rate, int64(day))
 				if err != nil {
-					telegramBot.ServerMessage(fmt.Sprintf("Submit Offer Error: %v", err))
+					logger.LOG.Errorf("Submit Offer Error: %v", err)
 					break
 				}
-				rate += config.GetIncreaseRate()
+				rate += config_manage.Config.GetIncreaseRate()
 			}
 		}
 	}

@@ -12,5 +12,7 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/line/line-bot-sdk-go v7.1.0+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7 // indirect
+	github.com/rossmcdonald/telegram_hook v0.0.0-20181023143956-eaf404d9475a
+	github.com/sirupsen/logrus v1.4.2
 	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 )

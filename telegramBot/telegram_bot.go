@@ -1,13 +1,14 @@
 package telegramBot
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-telegram-bot-api/telegram-bot-api"
+	"robot/bfApi"
 	"robot/config_manage"
 	"robot/utils"
 )
@@ -15,17 +16,17 @@ import (
 var bot *tgbotapi.BotAPI
 var numericKeyboard = tgbotapi.NewReplyKeyboard(
 	tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("總利息"),
-		tgbotapi.NewKeyboardButton("放貸金額"),
-		tgbotapi.NewKeyboardButton("錢包"),
+		tgbotapi.NewKeyboardButton("利息"),
+		//tgbotapi.NewKeyboardButton("放貸金額"),
+		//tgbotapi.NewKeyboardButton("錢包"),
 		tgbotapi.NewKeyboardButton("config"),
 	),
-	tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("CrazyRate:0.0009"),
-		tgbotapi.NewKeyboardButton("CrazyRate:0.00085"),
-		tgbotapi.NewKeyboardButton("CrazyRate:0.0008"),
-		tgbotapi.NewKeyboardButton("CrazyRate:0.00075"),
-	),
+	//tgbotapi.NewKeyboardButtonRow(
+	//	tgbotapi.NewKeyboardButton("CrazyRate:0.0009"),
+	//	tgbotapi.NewKeyboardButton("CrazyRate:0.00085"),
+	//	tgbotapi.NewKeyboardButton("CrazyRate:0.0008"),
+	//	tgbotapi.NewKeyboardButton("CrazyRate:0.00075"),
+	//),
 )
 
 type Rate float64
@@ -58,7 +59,7 @@ func Listen() {
 		if err != nil {
 			log.Printf("telegram-bot update channel error : %v", err)
 		}
-		config := config_manage.NewConfig()
+
 		for update := range updates {
 			if update.Message == nil { // ignore non-Message updates
 				continue
@@ -74,11 +75,12 @@ func Listen() {
 				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				break
 			case "config":
-				content, _ := utils.JsonString(config)
+				content, _ := utils.JsonString(config_manage.Config)
 				msg.Text = content
 				break
+			case "利息":
+				msg.Text = GetInterestInfo()
 			default:
-				fmt.Println("In default")
 				key, val := parseText(update.Message.Text)
 				msg.Text = ReplyAction(key, val)
 			}
@@ -142,31 +144,30 @@ func ReplyAction(key, val string) (reply string) {
 		return "找不到對應動作"
 	}
 
-	config := config_manage.NewConfig()
 	reply = "執行完畢"
 	switch key {
 	case "CrazyRate":
 		rate, _ := strconv.ParseFloat(val, 64)
-		config.SetCrazyRate(rate)
+		config_manage.Config.SetCrazyRate(rate)
 		break
 	case "IncreaseRate":
 		rate, _ := strconv.ParseFloat(val, 64)
-		config.SetIncreaseRate(rate)
+		config_manage.Config.SetIncreaseRate(rate)
 		break
 	case "BottomRate":
 		rate, _ := strconv.ParseFloat(val, 64)
-		config.SetBottomRate(rate)
+		config_manage.Config.SetBottomRate(rate)
 		break
 	case "FixedAmount":
 		rate, _ := strconv.ParseFloat(val, 64)
-		config.SetFixedAmount(rate)
+		config_manage.Config.SetFixedAmount(rate)
 		break
 	case "Day":
 		day, _ := strconv.Atoi(val)
-		config.SetDay(day)
+		config_manage.Config.SetDay(day)
 		break
 	case "SubmitOffer":
-		config.SetSubmitOffer(val == "Y" || val == "y")
+		config_manage.Config.SetSubmitOffer(val == "Y" || val == "y")
 		break
 	default:
 		reply = "找不到對應動作"
@@ -174,3 +175,53 @@ func ReplyAction(key, val string) (reply string) {
 
 	return reply
 }
+
+type DailyInterestReport struct {
+	Balance float64 `json:"錢包總額"`
+	TotalInterest float64 `json:"利息總額"`
+	InterestList []map[string]interface{} `json:"利息清單"`
+}
+
+// 取得近十天的利息
+func GetInterestInfo() string {
+	report := &DailyInterestReport{}
+
+	end := time.Now().UnixNano()/ int64(time.Millisecond)
+	list := bfApi.GetLedgers(end)
+	count := 0
+	for len(list) > 0 {
+		for _, data := range list {
+
+			if data.Description == "Margin Funding Payment on wallet funding" {
+				count++
+
+				// 第一筆為總金額
+				if count == 1 {
+					report.Balance = data.Balance
+				}
+
+				report.TotalInterest += data.Amount
+
+				if count > 10 {
+					continue
+				}
+				earnInfo := map[string]interface{}{}
+				dateTime := time.Unix(data.MTS/1000, 0).Format("2006-01-02 15:04:05")
+				earnInfo["Date"] = dateTime
+				earnInfo["Interest"] = data.Amount
+				report.InterestList = append(report.InterestList, earnInfo)
+			}
+			end = data.MTS
+		}
+
+		list = bfApi.GetLedgers(end)
+	}
+
+
+
+	content, _ := utils.JsonString(report)
+	//ServerMessage(content)
+	log.Print("Get Interest Info Done")
+	return content
+}
+
