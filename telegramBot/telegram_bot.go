@@ -162,6 +162,10 @@ func ReplyAction(key, val string) (reply string) {
 		rate, _ := strconv.ParseFloat(val, 64)
 		config_manage.Config.SetFixedAmount(rate)
 		break
+	case "InValidRate":
+		rate, _ := strconv.ParseFloat(val, 64)
+		config_manage.Config.SetInValidRate(rate)
+		break
 	case "Day":
 		day, _ := strconv.Atoi(val)
 		config_manage.Config.SetDay(day)
