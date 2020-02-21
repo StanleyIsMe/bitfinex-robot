@@ -5,7 +5,7 @@
             "script": "./robot",
             "exec_interpreter": "",
             "exec_mode": "fork",
-            "cron_restart": "0 */12 * * *",
+            "cron_restart": "0 0 * * 0",
             "autorestart": true
         }
     ]

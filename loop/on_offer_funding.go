@@ -48,7 +48,7 @@ loop:
 		case <-time.After(1 * time.Minute):
 			now := time.Now()
 			lastFifteenMinute := now.Add(-15 * time.Minute).Unix()
-			lastTwoHour := now.Add(-120 * time.Minute).Unix()
+			lastTwoHour := now.Add(-30 * time.Minute).Unix()
 			// 每日歸零
 			if now.Hour() == 0 && now.Minute() == 0 {
 				object.UnMatchedCount = 0
