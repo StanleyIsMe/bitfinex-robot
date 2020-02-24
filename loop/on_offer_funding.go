@@ -66,10 +66,13 @@ loop:
 					if lastFifteenMinute > (offer.MTSCreated / 1000) {
 						object.UnMatchedCount++
 
-						if object.UnMatchedCount%3 == 0 {
-							config_manage.Config.SetWeights("book03", -1)
-							config_manage.Config.SetWeights("avg100", 1)
-						}
+						//if object.UnMatchedCount%3 == 0 {
+						//	config_manage.Config.SetWeights("book03", -1)
+						//	config_manage.Config.SetWeights("avg100", 1)
+						//}
+						config_manage.Config.SetWeights("book03", -1)
+						config_manage.Config.SetWeights("book01", 1)
+						config_manage.Config.SetWeights("avg100", 1)
 						bfApi.CancelFundingOffer(offer.ID)
 
 						object.last = now.Unix()
