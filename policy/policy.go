@@ -110,7 +110,9 @@ func TrackMatchPrice() float64 {
 
 		}
 	}
+
 	allAvg = allAvg / float64(total)
+
 
 	// 假如沒設定最小利率，則以市場最高出價利率當作最低
 	bottomRate := config_manage.Config.GetBottomRate()
@@ -138,6 +140,10 @@ func excueBookAvg(list []*bitfinex.BookUpdate, inValidRate float64) (average flo
 			count++
 		}
 	}
+
+	if count == 0 {
+		return 0
+	}
 	return average / count
 }
 
@@ -148,6 +154,10 @@ func excueMatchedAvg(list []*bitfinex.Trade, inValidRate float64) (average float
 			average += data.Price
 			count++
 		}
+	}
+
+	if count == 0 {
+		return 0
 	}
 	return average / count
 }
