@@ -18,7 +18,18 @@ import (
 	"robot/loop"
 	"robot/policy"
 	"robot/telegramBot"
+	"robot/user"
+	"robot/utils"
+	"robot/utils/redis"
 )
+
+func demo() {
+	pool := user.NewPool()
+	pool.RegisterUser()
+	result := pool.GetAllUser()
+	utils.PrintWithStruct(result)
+	os.Exit(1)
+}
 
 func main() {
 	err := godotenv.Load()
@@ -26,9 +37,16 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	config_manage.NewConfig()
 	logger.InitLogger()
-	policy.InitPolicy()
+	config_manage.NewConfig()
+	utils.InitWorkerPool()
+	redis.Init()
+	bfApi.ApiInit()
+
+	demo()
+
+
+	//policy.InitPolicy()
 	telegramBot.BotInit()
 	telegramBot.Listen()
 	bfApi.ApiInit()

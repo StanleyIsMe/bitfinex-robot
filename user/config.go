@@ -1,4 +1,4 @@
-package config_manage
+package user
 
 import (
 	"os"
@@ -18,45 +18,37 @@ type ConfigManage struct {
 	SubmitOffer  bool           `json:"自動放貸"`
 	InValidRate  float64        `json:"無效利率"`
 	Weights      map[string]int `json:"利率計算權重"`
-
 }
 
 var Config *ConfigManage
 
 func NewConfig() *ConfigManage {
-	var once sync.Once
 
-	if Config == nil {
-		once.Do(func() {
+	bottomRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_BOTTOM_RATE"), 64)
+	crazyRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_CRAZY_RATE"), 64)
+	fixedAmount, _ := strconv.ParseFloat(os.Getenv("FUNDING_FIXED_AMOUNT"), 64)
+	increaseRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_INCREASE_RATE"), 64)
+	telegramId, _ := strconv.ParseInt(os.Getenv("TELEGRAM_MANAGE_ID"), 10, 64)
+	invalidRate, _ := strconv.ParseFloat(os.Getenv("INVALID_RATE"), 64)
+	submitOffer := os.Getenv("AUTO_SUBMIT_FUNDING") == "Y"
 
-			bottomRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_BOTTOM_RATE"), 64)
-			crazyRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_CRAZY_RATE"), 64)
-			fixedAmount, _ := strconv.ParseFloat(os.Getenv("FUNDING_FIXED_AMOUNT"), 64)
-			increaseRate, _ := strconv.ParseFloat(os.Getenv("FUNDING_INCREASE_RATE"), 64)
-			telegramId, _ := strconv.ParseInt(os.Getenv("TELEGRAM_MANAGE_ID"), 10, 64)
-			invalidRate, _ := strconv.ParseFloat(os.Getenv("INVALID_RATE"), 64)
-			submitOffer := os.Getenv("AUTO_SUBMIT_FUNDING") == "Y"
-
-			Config = &ConfigManage{
-				RWMutex:      sync.RWMutex{},
-				BottomRate:   bottomRate,
-				FixedAmount:  fixedAmount,
-				Day:          2,
-				CrazyRate:    crazyRate,
-				IncreaseRate: increaseRate,
-				TelegramId:   telegramId,
-				SubmitOffer:  submitOffer,
-				InValidRate:  invalidRate,
-				Weights: map[string]int{
-					"book01":   1,
-					"book02":   1,
-					"book03":   8,
-					"book04":   10,
-					"avg100":   1,
-					"avg10000": 3,
-				},
-			}
-		})
+	Config = &ConfigManage{
+		RWMutex:      sync.RWMutex{},
+		BottomRate:   bottomRate,
+		FixedAmount:  fixedAmount,
+		Day:          2,
+		CrazyRate:    crazyRate,
+		IncreaseRate: increaseRate,
+		TelegramId:   telegramId,
+		SubmitOffer:  submitOffer,
+		InValidRate:  invalidRate,
+		Weights: map[string]int{
+			"book01":   1,
+			"book02":   1,
+			"book03":   10,
+			"avg100":   1,
+			"avg10000": 3,
+		},
 	}
 
 	return Config
@@ -168,8 +160,7 @@ func (config *ConfigManage) WeightsInit() {
 	config.Weights = map[string]int{
 		"book01":   1,
 		"book02":   1,
-		"book03":   8,
-		"book04":   10,
+		"book03":   10,
 		"avg100":   1,
 		"avg10000": 3,
 	}
