@@ -79,7 +79,7 @@ func TrackMatchPrice() float64 {
 	p0Avg := excueBookAvg(offerListP0, inValidRate)
 	p1Avg := excueBookAvg(offerListP1, inValidRate)
 	p2Avg := excueBookAvg(offerListP2, inValidRate)
-	matchAvg1 := excueMatchedAvg(matchedList[0:100], inValidRate)
+	matchAvg1 := excueMatchedAvg(matchedList[len(matchedList)-100:], inValidRate)
 	matchAvg2 := excueMatchedAvg(matchedList, inValidRate)
 
 	weights := config_manage.Config.GetWeights()
