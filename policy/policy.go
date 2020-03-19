@@ -132,6 +132,29 @@ func TrackMatchPrice() float64 {
 	return allAvg
 }
 
+func TrackMatchPrice2() float64 {
+
+	// 無效值先隨意暫定
+	inValidRate := 0.00015
+
+	matchedList, err := bfApi.GetMatched(1000)
+	if err != nil {
+		return 0
+	}
+
+	// 算市場平均價
+	matchAvg1 := excueMatchedAvg(matchedList[0:100], inValidRate)
+
+	// 假如沒設定最小利率，則以市場最高出價利率當作最低
+	bottomRate := config_manage.Config.GetBottomRate()
+
+	if bottomRate > matchAvg1 {
+		return bottomRate
+	}
+
+	return matchAvg1
+}
+
 func excueBookAvg(list []*bitfinex.BookUpdate, inValidRate float64) (average float64) {
 	var count float64
 	for _, data := range list {

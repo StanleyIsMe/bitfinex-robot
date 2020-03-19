@@ -90,7 +90,7 @@ func submitFunding(notifyChannel <-chan int) {
 		// 放貸天數
 		day := config_manage.Config.GetDay()
 		// 計算放貸利率
-		rate := policy.TrackMatchPrice()
+		rate := policy.TrackMatchPrice2()
 
 		if rate <= config_manage.Config.InValidRate {
 			log.Println("計算結果低於: ", rate)
