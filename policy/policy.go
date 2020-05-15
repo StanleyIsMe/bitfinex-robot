@@ -7,6 +7,7 @@ import (
 	"github.com/bitfinexcom/bitfinex-api-go/v2"
 	"robot/bfApi"
 	"robot/config_manage"
+	"robot/utils"
 )
 
 type Wallet struct {
@@ -74,12 +75,12 @@ func TrackMatchPrice() float64 {
 	if err != nil || err0 != nil || err1 != nil || err2 != nil {
 		return 0
 	}
-
+	utils.PrintWithStruct(matchedList)
 	// 算市場平均價
 	p0Avg := excueBookAvg(offerListP0, inValidRate)
 	p1Avg := excueBookAvg(offerListP1, inValidRate)
 	p2Avg := excueBookAvg(offerListP2, inValidRate)
-	matchAvg1 := excueMatchedAvg(matchedList[len(matchedList)-100:], inValidRate)
+	matchAvg1 := excueMatchedAvg(matchedList[0:100], inValidRate)
 	matchAvg2 := excueMatchedAvg(matchedList, inValidRate)
 
 	weights := config_manage.Config.GetWeights()
