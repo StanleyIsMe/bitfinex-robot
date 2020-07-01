@@ -66,7 +66,7 @@ func TrackMatchPrice() float64 {
 	log.Println("Use TrackMatchPrice Policy")
 
 	// 無效值先隨意暫定
-	inValidRate := 0.0003
+	inValidRate := config_manage.Config.GetInValidRate()
 
 	bidListP0, offerListP0, err0 := bfApi.GetBook(bitfinex.Precision0)
 	_, offerListP1, err1 := bfApi.GetBook(bitfinex.Precision1)
