@@ -67,13 +67,11 @@ loop:
 						object.UnMatchedCount++
 
 						if object.UnMatchedCount%2 == 0 {
+							config_manage.Config.SetWeights("book04", -1)
 							config_manage.Config.SetWeights("book03", -1)
 							config_manage.Config.SetWeights("book01", 1)
 							config_manage.Config.SetWeights("avg100", 1)
 						}
-						//config_manage.Config.SetWeights("book03", -1)
-						//config_manage.Config.SetWeights("book01", 1)
-						//config_manage.Config.SetWeights("avg100", 1)
 
 						bfApi.CancelFundingOffer(offer.ID)
 

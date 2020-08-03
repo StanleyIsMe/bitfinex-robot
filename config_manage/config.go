@@ -50,7 +50,8 @@ func NewConfig() *ConfigManage {
 				Weights: map[string]int{
 					"book01":   1,
 					"book02":   1,
-					"book03":   10,
+					"book03":   8,
+					"book04":   10,
 					"avg100":   1,
 					"avg10000": 3,
 				},
@@ -167,7 +168,8 @@ func (config *ConfigManage) WeightsInit() {
 	config.Weights = map[string]int{
 		"book01":   1,
 		"book02":   1,
-		"book03":   10,
+		"book03":   8,
+		"book04":   10,
 		"avg100":   1,
 		"avg10000": 3,
 	}
