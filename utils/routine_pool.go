@@ -3,145 +3,87 @@ package utils
 import (
 	"context"
 	"sync"
-	"sync/atomic"
-)
-
-var (
-	InstanceRoutinePool *RoutinePool
 )
 
 const (
-	DefaultPoolSize = 16
+	PoolSize     = 8
+	inputChannel = 100
+	jobChannel   = 100
 )
 
-// 任務
+var WorkerPoolInstance *WorkerPool
+
+// 方法
 type TaskMethod func(params []interface{}) interface{}
 
-///任務参数
+// 参数
 type TaskParam struct {
 	TaskMethod TaskMethod
 	TaskParam  []interface{}
 }
 
-///协程上下文
-type Worker struct {
-	sync.RWMutex
-	idleFlag int32 //是否閒置
-	ctx      context.Context
-	cancel   context.CancelFunc
-	taskCh   chan *TaskParam
-	wg       *sync.WaitGroup
-	parentWG *sync.WaitGroup
+type WorkerPool struct {
+	inputChan chan *TaskParam
+	jobsChan  chan *TaskParam
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     *sync.WaitGroup
 }
 
-///协程方法
-func (object *Worker) run() {
-	object.wg.Add(1)
-loop:
+func InitWorkerPool() {
+	WorkerPoolInstance = NewWorkerPool()
+}
+
+func (c *WorkerPool) listen() {
+	defer close(c.jobsChan)
 	for {
 		select {
-		case <-object.ctx.Done():
-			break loop
-		case taskParam, ok := <-object.taskCh:
-			if !ok {
+		case job, ok := <-c.inputChan:
+			if c.ctx.Err() != nil && !ok {
+				return
+			}
+			c.jobsChan <- job
+		}
+	}
+}
+
+func (c *WorkerPool) worker(num int) {
+	defer c.wg.Done()
+	for {
+		select {
+		case job, ok := <-c.jobsChan:
+			if c.ctx.Err() != nil && !ok {
+				return
+			}
+			job.TaskMethod(job.TaskParam)
+		case <-c.ctx.Done():
+			if len(c.jobsChan) > 0 {
 				continue
 			}
-
-			// cancel worker
-			if object.ctx.Err() != nil {
-				break loop
-			}
-
-			object.parentWG.Add(1)
-			taskParam.TaskMethod(taskParam.TaskParam)
-			object.parentWG.Done()
-			atomic.StoreInt32(&object.idleFlag, 1)
+			return
 		}
 	}
-	object.wg.Done()
 }
 
-// worker pool
-type RoutinePool struct {
-	sync.RWMutex
-	minRoutine int64
-	workerPool []*Worker
-	ctx        context.Context
-	cancel     context.CancelFunc
-	wg         *sync.WaitGroup
-}
-
-func NewRoutinePool(minRouting int64) *RoutinePool {
-	object := &RoutinePool{
-		minRoutine: minRouting,
-		wg:         &sync.WaitGroup{},
-	}
-	object.ctx, object.cancel = context.WithCancel(context.Background())
-	object.workerPool = make([]*Worker, minRouting)
-
-	for i := int64(0); i < minRouting; i++ {
-		worker := &Worker{
-			idleFlag: 1,
-			taskCh:   make(chan *TaskParam, 16),
-			parentWG: object.wg,
-			wg:       &sync.WaitGroup{},
-		}
-		worker.ctx, worker.cancel = context.WithCancel(context.Background())
-		object.workerPool[i] = worker
-		go worker.run()
+func NewWorkerPool() *WorkerPool {
+	pool := &WorkerPool{
+		inputChan: make(chan *TaskParam, inputChannel),
+		jobsChan:  make(chan *TaskParam, jobChannel),
+		wg:        &sync.WaitGroup{},
 	}
 
-	return object
-}
+	pool.ctx, pool.cancel = context.WithCancel(context.Background())
 
-///回收worker
-func (object *RoutinePool) recycleWorker(worker *Worker) {
-	worker.cancel()
-	worker.wg.Wait()
-
-	worker.Lock()
-	close(worker.taskCh)
-	worker.taskCh = nil
-	worker.Unlock()
-}
-
-///提交任务
-func (object *RoutinePool) PostTask(task TaskMethod, params ...interface{}) {
-	object.Lock()
-	defer object.Unlock()
-
-	i := 0
-	for i < len(object.workerPool) {
-		worker := object.workerPool[i]
-
-		if atomic.LoadInt32(&(worker.idleFlag)) == 0 {
-			i++
-			continue
-		}
-
-		atomic.StoreInt32(&(worker.idleFlag), 0)
-
-		worker.RLock()
-		if worker.taskCh != nil && cap(worker.taskCh) > 0 {
-			worker.taskCh <- &TaskParam{TaskMethod: task, TaskParam: params}
-		}
-		worker.RUnlock()
-		break
+	for i := 0; i < PoolSize; i++ {
+		pool.wg.Add(1)
+		go pool.worker(i)
 	}
+
+	go pool.listen()
+	return pool
 }
 
-func (object *RoutinePool) Close() {
-	object.cancel()
-	object.wg.Wait()
-	object.Lock()
-	defer object.Unlock()
-	for _, worker := range object.workerPool {
-		object.recycleWorker(worker)
-	}
-	object.workerPool = nil
-}
-
-///初始化
-func InitWorkerPool() {
-	InstanceRoutinePool = NewRoutinePool(DefaultPoolSize)
+func (c *WorkerPool) AddTask(task TaskMethod, params ...interface{}) {
+	c.inputChan <- &TaskParam{TaskMethod: task, TaskParam: params}
 }

@@ -24,3 +24,24 @@ func NewWallet() *Wallet {
 
 	return myWallet
 }
+
+func (object *Wallet) Update(balance, balanceAvailable float64) {
+	object.Lock()
+	object.Balance = balance
+	object.BalanceAvailable = balanceAvailable
+	object.Unlock()
+}
+
+func (object *Wallet) GetAmount(basicAmount float64) float64 {
+	minimumAmount := 50.0
+	object.Lock()
+	defer object.Unlock()
+
+	if ((object.BalanceAvailable - basicAmount) < minimumAmount) || (object.BalanceAvailable <= basicAmount) {
+		temp := object.BalanceAvailable
+		object.BalanceAvailable = 0
+		return temp
+	}
+	object.BalanceAvailable -= basicAmount
+	return basicAmount
+}

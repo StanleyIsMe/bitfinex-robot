@@ -24,10 +24,9 @@ import (
 )
 
 func demo() {
-	pool := user.NewPool()
-	pool.RegisterUser()
+	pool := user.NewPool(10)
+	pool.RegisterUser(123,"","")
 	result := pool.GetAllUser()
-	utils.PrintWithStruct(result)
 	os.Exit(1)
 }
 
