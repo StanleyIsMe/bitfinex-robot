@@ -4,12 +4,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/astaxie/beego/toolbox"
-	"robot/bfApi"
-	"robot/bfSocket"
-	"robot/logger"
-	"robot/telegramBot"
 )
 
 //type DailyInterestReport struct {
@@ -59,26 +56,26 @@ func Start() {
 	//	return nil
 	//})
 
-	task2 := toolbox.NewTask("機器人檢查", "0 0 */4 * * *", func() error {
-		// work
-		//lineBot.LineSendMessage("我還在工作唷")
-		//utils.SendEmail("我有在工作拉 請放心", "Robot on working")
-		bfApi.ApiInit()
-		telegramBot.ServerMessage("我有在工作拉 請放心")
-		return nil
-	})
-
-	task3 := toolbox.NewTask("Bitfinex socket validator", "0 0 * * * *", func() error {
-		if !bfSocket.IsConnected() {
-			logger.LOG.Errorf("Bitfinex Socket Connected Failed")
-		}
-		log.Println("Bitfinex Socket On Connected")
-		return nil
-	})
+	//task2 := toolbox.NewTask("機器人檢查", "0 0 */4 * * *", func() error {
+	//	// work
+	//	//lineBot.LineSendMessage("我還在工作唷")
+	//	//utils.SendEmail("我有在工作拉 請放心", "Robot on working")
+	//	//bfApi.ApiInit()
+	//	telegramBot.ServerMessage("我有在工作拉 請放心")
+	//	return nil
+	//})
+	//
+	//task3 := toolbox.NewTask("Bitfinex socket validator", "0 0 * * * *", func() error {
+	//	if !bfSocket.IsConnected() {
+	//		logger.LOG.Errorf("Bitfinex Socket Connected Failed")
+	//	}
+	//	log.Println("Bitfinex Socket On Connected")
+	//	return nil
+	//})
 
 	task4 := toolbox.NewTask("Prevent Heroku Sleep", "0 */10 * * * *", func() error {
 		log.Println("Heroku Wake Up")
-		res, err := http.Get("https://bf-robot.herokuapp.com/")
+		res, err := http.Get(os.Getenv("WEB_URL"))
 		if err != nil {
 			log.Println(err)
 		}
@@ -92,8 +89,8 @@ func Start() {
 	})
 
 	//toolbox.AddTask("放貸收穫", task1)
-	toolbox.AddTask("機器人檢查", task2)
-	toolbox.AddTask("Bitfinex socket validator", task3)
+	//toolbox.AddTask("機器人檢查", task2)
+	//toolbox.AddTask("Bitfinex socket validator", task3)
 	toolbox.AddTask("Prevent Heroku Sleep", task4)
 
 	toolbox.StartTask()

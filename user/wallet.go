@@ -1,6 +1,10 @@
 package user
 
-import "sync"
+import (
+	"os"
+	"strconv"
+	"sync"
+)
 
 type Wallet struct {
 	sync.RWMutex
@@ -33,7 +37,7 @@ func (object *Wallet) Update(balance, balanceAvailable float64) {
 }
 
 func (object *Wallet) GetAmount(basicAmount float64) float64 {
-	minimumAmount := 50.0
+	minimumAmount,_ := strconv.ParseFloat(os.Getenv("OFFICIAL_MIN_FUNDING_MONEY"), 64)
 	object.Lock()
 	defer object.Unlock()
 

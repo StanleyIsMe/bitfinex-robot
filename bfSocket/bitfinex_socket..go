@@ -3,6 +3,7 @@ package bfSocket
 import (
 	"log"
 	"os"
+	"robot/utils"
 	"time"
 
 	//"sync"
@@ -12,7 +13,7 @@ import (
 	"github.com/bitfinexcom/bitfinex-api-go/v2/websocket"
 )
 
-var socket *websocket.Client
+//var socket *websocket.Client
 
 type Socket struct {
 	Client *websocket.Client
@@ -30,14 +31,16 @@ func NewSocket(key, secret string) *Socket {
 	p.URL = os.Getenv("BFX_WS_URI")
 	//socket = websocket.NewWithParams(p).Credentials(key, secret)
 
-	//err:= socket.Connect()
-	//if err != nil {
-	//	log.Fatal("Error connecting to bitfinex web socket : ", err)
-	//}
-
-	return &Socket{
+	socket := &Socket{
 		Client: websocket.NewWithParams(p).Credentials(key, secret),
 	}
+
+	err := socket.Client.Connect()
+	if err != nil {
+		log.Fatal("Key [%s] Error connecting to bitfinex web socket : ", key, err)
+	}
+
+	return socket
 }
 
 func (st *Socket) IsConnected() bool {
@@ -74,11 +77,12 @@ func (st *Socket) Listen(updateWalletChan chan *bitfinex.WalletUpdate) {
 				//lineBot.LineSendMessage(content)
 
 			default:
-				//utils.PrintWithStruct(obj)
+				utils.PrintWithStruct(obj)
 			}
 		}
 	}()
 }
+
 //
 //func SocketInit() {
 //

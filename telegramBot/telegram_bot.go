@@ -1,16 +1,14 @@
 package telegramBot
 
 import (
+	"fmt"
+	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"log"
 	"os"
+	"robot/config_manage"
+	"robot/handler"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/go-telegram-bot-api/telegram-bot-api"
-	"robot/bfApi"
-	"robot/config_manage"
-	"robot/utils"
 )
 
 var bot *tgbotapi.BotAPI
@@ -29,6 +27,22 @@ var numericKeyboard = tgbotapi.NewReplyKeyboard(
 	//),
 )
 
+var inlineKeyboard = tgbotapi.NewInlineKeyboardMarkup(
+	tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("/help", HelpCommand()),
+		),
+	//tgbotapi.NewKeyboardButtonRow(
+	//	tgbotapi.NewKeyboardButton("利息"),
+	//	//tgbotapi.NewKeyboardButton("放貸金額"),
+	//	//tgbotapi.NewKeyboardButton("錢包"),
+	//	tgbotapi.NewKeyboardButton("config"),
+	//),
+)
+
+func HelpCommand() string {
+	return "利息"
+}
+
 type Rate float64
 
 var ActionBook = map[string]string{
@@ -44,7 +58,6 @@ func BotInit() {
 		}
 
 		bot.Debug = true
-
 		log.Printf("Authorized on account %s", bot.Self.UserName)
 	}
 
@@ -64,26 +77,42 @@ func Listen() {
 			if update.Message == nil { // ignore non-Message updates
 				continue
 			}
-
+			fmt.Println(update.Message.Command(), "!!",update.Message.CommandArguments(),"!!")
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-
-			switch update.Message.Text {
-			case "open":
-				msg.ReplyMarkup = numericKeyboard
+			switch update.Message.Command() {
+			case "register":
+				args := strings.Split(update.Message.CommandArguments(), "/")
+				if len(args) != 2 {
+					msg.Text = "請輸入正確格式: /register [token]/[password]"
+					break
+				}
+				msg.Text = handler.RegisterHandle(update.Message.Chat.ID, args[0], args[1])
 				break
-			case "close":
-				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-				break
-			case "config":
-				content, _ := utils.JsonString(config_manage.Config)
-				msg.Text = content
-				break
-			case "利息":
-				msg.Text = GetInterestInfo()
-			default:
-				key, val := parseText(update.Message.Text)
-				msg.Text = ReplyAction(key, val)
 			}
+
+			//switch update.Message.Text {
+			//case "tt":
+			//	msg.ReplyMarkup = inlineKeyboard
+			//	break
+			////case "/help":
+			////	msg.text = inlineKeyboard
+			//case "open":
+			//	msg.ReplyMarkup = numericKeyboard
+			//	break
+			//case "close":
+			//	msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+			//	break
+			//case "config":
+			//	content, _ := utils.JsonString(config_manage.Config)
+			//	msg.Text = content
+			//	break
+			//case "利息":
+			//	msg.Text = "功能未完成"
+			//	//msg.Text = GetInterestInfo()
+			//default:
+			//	key, val := parseText(update.Message.Text)
+			//	msg.Text = ReplyAction(key, val)
+			//}
 
 			if msg.Text == "" {
 				continue
@@ -96,16 +125,7 @@ func Listen() {
 	}()
 }
 
-func SendMessage(chatId int64, text string) {
-	if bot == nil {
-		BotInit()
-	}
 
-	msg := tgbotapi.NewMessage(chatId, text)
-	if _, err := bot.Send(msg); err != nil {
-		log.Printf("Send Message Error : %v", err)
-	}
-}
 
 func ServerMessage(text string) {
 	if bot == nil {
@@ -181,51 +201,48 @@ func ReplyAction(key, val string) (reply string) {
 }
 
 type DailyInterestReport struct {
-	Balance float64 `json:"錢包總額"`
-	TotalInterest float64 `json:"利息總額"`
-	InterestList []map[string]interface{} `json:"利息清單"`
+	Balance       float64                  `json:"錢包總額"`
+	TotalInterest float64                  `json:"利息總額"`
+	InterestList  []map[string]interface{} `json:"利息清單"`
 }
 
 // 取得近十天的利息
-func GetInterestInfo() string {
-	report := &DailyInterestReport{}
-
-	end := time.Now().UnixNano()/ int64(time.Millisecond)
-	list := bfApi.GetLedgers(end)
-	count := 0
-	for len(list) > 0 {
-		for _, data := range list {
-
-			if data.Description == "Margin Funding Payment on wallet funding" {
-				count++
-
-				// 第一筆為總金額
-				if count == 1 {
-					report.Balance = data.Balance
-				}
-
-				report.TotalInterest += data.Amount
-
-				if count > 10 {
-					continue
-				}
-				earnInfo := map[string]interface{}{}
-				dateTime := time.Unix(data.MTS/1000, 0).Format("2006-01-02 15:04:05")
-				earnInfo["Date"] = dateTime
-				earnInfo["Interest"] = data.Amount
-				report.InterestList = append(report.InterestList, earnInfo)
-			}
-			end = data.MTS
-		}
-
-		list = bfApi.GetLedgers(end-1)
-	}
-
-
-
-	content, _ := utils.JsonString(report)
-	//ServerMessage(content)
-	log.Print("Get Interest Info Done")
-	return content
-}
-
+//func GetInterestInfo() string {
+//	report := &DailyInterestReport{}
+//
+//	end := time.Now().UnixNano() / int64(time.Millisecond)
+//	list := bfApi.GetLedgers(end)
+//	count := 0
+//	for len(list) > 0 {
+//		for _, data := range list {
+//
+//			if data.Description == "Margin Funding Payment on wallet funding" {
+//				count++
+//
+//				// 第一筆為總金額
+//				if count == 1 {
+//					report.Balance = data.Balance
+//				}
+//
+//				report.TotalInterest += data.Amount
+//
+//				if count > 10 {
+//					continue
+//				}
+//				earnInfo := map[string]interface{}{}
+//				dateTime := time.Unix(data.MTS/1000, 0).Format("2006-01-02 15:04:05")
+//				earnInfo["Date"] = dateTime
+//				earnInfo["Interest"] = data.Amount
+//				report.InterestList = append(report.InterestList, earnInfo)
+//			}
+//			end = data.MTS
+//		}
+//
+//		list = bfApi.GetLedgers(end - 1)
+//	}
+//
+//	content, _ := utils.JsonString(report)
+//	//ServerMessage(content)
+//	log.Print("Get Interest Info Done")
+//	return content
+//}

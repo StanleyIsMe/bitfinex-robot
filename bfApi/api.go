@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -36,9 +37,12 @@ func NewAPIClient() *APIClient {
 	//	Client: rest.NewClientWithURL(url).Credentials(key, secret),
 	//}
 	APIOnce.Do(func() {
+		url := os.Getenv("BFX_API_URI")
+		pubClient := rest.NewClientWithURL(url).Credentials(os.Getenv("API_KEY"), os.Getenv("API_SEC"))
 		APIClientInstance = &APIClient{
 			rateCount:  10,
 			ClientList: make(map[int64]*rest.Client, 0),
+			PublicClient:pubClient,
 		}
 
 		APIClientInstance.ctx, APIClientInstance.cancel = context.WithCancel(context.Background())
@@ -86,11 +90,14 @@ func (api *APIClient) RegisterClient(userId int64, key, secret string) bool {
 	url := os.Getenv("BFX_API_URI")
 	if _, ok := api.ClientList[userId]; !ok {
 		tempClient := rest.NewClientWithURL(url).Credentials(key, secret)
-		if _, err := tempClient.Wallet.Wallet(); err == nil {
-			api.ClientList[userId] = tempClient
-			return true
+		if _, err := tempClient.Wallet.Wallet(); err != nil {
+			log.Printf("UserId [%d] Bitfinex Api Fail %v", userId, err)
+			return false
 		}
-		return false
+
+		log.Printf("UserId [%d] Bitfinex Api Success", userId)
+		api.ClientList[userId] = tempClient
+		return true
 	}
 	return true
 }

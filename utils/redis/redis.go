@@ -45,8 +45,8 @@ func (client *RedisClient) close() {
 	client.conn.Close()
 }
 
-func HSET(key, field string, value interface{}) error {
-	err := redisClient.conn.HSet(key, field, value).Err()
+func HSET(key string, values map[string]interface{}) error {
+	err := redisClient.conn.HMSet(key, values).Err()
 	if err != nil {
 		redisClient.log.Errorf("Redis HSET Error : %v", err)
 		return err
@@ -71,6 +71,10 @@ func HSET(key, field string, value interface{}) error {
 
 func HGET(key, field string) (string, error) {
 	result, err := redisClient.conn.HGet(key, field).Result()
+	if err == redis.Nil {
+		return "" ,nil
+	}
+
 	if err != nil {
 		redisClient.log.Errorf("Redis HSET Error : %v", err)
 		return "", err
@@ -81,6 +85,9 @@ func HGET(key, field string) (string, error) {
 func HGetAll(key string) (map[string]string, error) {
 	result, err := redisClient.conn.HGetAll(key).Result()
 
+	if err == redis.Nil {
+		return nil ,nil
+	}
 	if err != nil {
 		redisClient.log.Errorf("Redis HGetAll Error : %v", err)
 		return nil, err
