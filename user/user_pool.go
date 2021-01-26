@@ -2,7 +2,6 @@ package user
 
 import (
 	"errors"
-	"fmt"
 	"github.com/sirupsen/logrus"
 	"os"
 	"robot/logger"
@@ -32,8 +31,8 @@ func NewPool(userNumLimit int) *Pool {
 			UserList:     make(map[int64]*UserInfo, 0),
 			UserNumLimit: userNumLimit,
 		}
-		UserPool.SetManageUser()
-
+		//UserPool.SetManageUser()
+		UserPool.InitAllUser()
 	})
 	return UserPool
 }
@@ -62,6 +61,10 @@ func (pool *Pool) RegisterUser(telegramId int64, key, sec string) error {
 		return errors.New("註冊人數已滿")
 	}
 
+	if _, ok := pool.UserList[telegramId]; ok {
+		return errors.New("已註冊過")
+	}
+
 	telegramIdStr := strconv.Itoa(int(telegramId))
 	result, err := redis.HGET(UserKey, telegramIdStr)
 	if err != nil {
@@ -78,35 +81,49 @@ func (pool *Pool) RegisterUser(telegramId int64, key, sec string) error {
 	//}
 
 	newuser := NewUser(telegramId, key, sec)
-	//fmt.Println(newuser.MarshalBinary())
-	mp := newuser.Config.ConvertToMap()
-	fmt.Println(mp,"!!!!!!!!!!!!")
-	if err := redis.HSET(fmt.Sprintf("%s:%s",UserKey, telegramIdStr), mp); err != nil {
+
+	if err := redis.HSET(UserKey, telegramIdStr, newuser); err != nil {
 		return err
 	}
+
+	//result2, err := redis.HGET(UserKey, telegramIdStr)
+	//if err != nil {
+	//	fmt.Println(err, "!!!")
+	//	return err
+	//}
+	//
+	//us := &UserInfo{}
+	//if err := us.UnmarshalBinary([]byte(result2)); err != nil {
+	//	fmt.Println(err, "!!!")
+	//	return err
+	//}
+	//
+	//utils.PrintWithStruct(us)
+	//fmt.Println("==========================")
 	pool.UserList[telegramId] = newuser
 	return nil
 }
 
-//func (pool *Pool) GetAllUser() map[int64]*UserInfo {
-//	result, err := redis.HGetAll(UserKey)
-//
-//	if err != nil {
-//		return nil
-//	}
-//	response := make(map[int64]*UserInfo, 0)
-//
-//	for _, val := range result {
-//		var user UserInfo
-//		//msgpack.Unmarshal([]byte(val), &user)
-//		//user.BinaryUnmarshaler([]byte(val))
-//		//user.TelegramId = key
-//		response[user.TelegramId] = &user
-//		//pool.UserList = append(pool.UserList, &user)
-//	}
-//
-//	return response
-//}
+func (pool *Pool) InitAllUser() {
+	result, err := redis.HGetAll(UserKey)
+
+	if err != nil {
+		logger.LOG.Errorf("redis.HGetAll Error %v", err)
+		return
+	}
+
+	for _, val := range result {
+		user := &UserInfo{}
+		err := user.UnmarshalBinary([]byte(val))
+		if err != nil {
+			logger.LOG.Errorf("InitAllUser Error %v", err)
+			continue
+		}
+		user.StartActive()
+		pool.UserList[user.TelegramId] = user
+	}
+}
+
 func (pool *Pool) GetUserById(telegramId int64) *UserInfo {
 	pool.Lock()
 	defer pool.Unlock()

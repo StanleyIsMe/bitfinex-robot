@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"robot/config_manage"
 	"robot/user"
 	"robot/utils/s2c"
 	"syscall"
@@ -31,7 +30,7 @@ func main() {
 	}
 
 	logger.InitLogger()
-	config_manage.NewConfig()
+	//config_manage.NewConfig()
 	//utils.InitWorkerPool()
 	redis.Init()
 	//bfApi.ApiInit()
@@ -41,7 +40,7 @@ func main() {
 	s2c.NewTgMessage()
 	//policy.InitPolicy()
 	telegramBot.BotInit()
-	telegramBot.Listen()
+	//telegramBot.Listen()
 	//bfApi.ApiInit()
 	//bfSocket.SocketInit()
 	//crontab.Start()

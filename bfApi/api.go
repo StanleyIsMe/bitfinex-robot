@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/book"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/common"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/fundingoffer"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/ledger"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/trade"
 	"log"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/bitfinexcom/bitfinex-api-go/v2"
 	"robot/logger"
 	"robot/utils"
 
@@ -32,10 +36,6 @@ var APIOnce sync.Once
 var APIClientInstance *APIClient
 
 func NewAPIClient() *APIClient {
-	//url := os.Getenv("BFX_API_URI")
-	//return &APIClient{
-	//	Client: rest.NewClientWithURL(url).Credentials(key, secret),
-	//}
 	APIOnce.Do(func() {
 		url := os.Getenv("BFX_API_URI")
 		pubClient := rest.NewClientWithURL(url).Credentials(os.Getenv("API_KEY"), os.Getenv("API_SEC"))
@@ -46,6 +46,7 @@ func NewAPIClient() *APIClient {
 		}
 
 		APIClientInstance.ctx, APIClientInstance.cancel = context.WithCancel(context.Background())
+		go APIClientInstance.LoopCalculateRateLimit()
 	})
 	return APIClientInstance
 }
@@ -56,7 +57,6 @@ loop:
 		select {
 		case <-time.After(1 * time.Minute):
 			api.Lock()
-			logger.LOG.Info("API Rate 歸零")
 			api.rateCount = 0
 			api.Unlock()
 		case <-api.ctx.Done():
@@ -68,8 +68,10 @@ loop:
 func (api *APIClient) CheckRateCount() error {
 	api.Lock()
 	defer api.Unlock()
+	log.Printf("API Rate Count [%d]", api.rateCount)
 
 	if api.rateCount >= RateLimit {
+		log.Println("Reached API Rate limit")
 		return errors.New("Reached API Rate limit")
 	}
 	api.rateCount++
@@ -91,7 +93,7 @@ func (api *APIClient) RegisterClient(userId int64, key, secret string) bool {
 	if _, ok := api.ClientList[userId]; !ok {
 		tempClient := rest.NewClientWithURL(url).Credentials(key, secret)
 		if _, err := tempClient.Wallet.Wallet(); err != nil {
-			log.Printf("UserId [%d] Bitfinex Api Fail %v", userId, err)
+			logger.LOG.Errorf("UserId [%d] Bitfinex Api Fail %v", userId, err)
 			return false
 		}
 
@@ -103,7 +105,7 @@ func (api *APIClient) RegisterClient(userId int64, key, secret string) bool {
 }
 
 // 每日funding offer 利息獲得及總資產
-func (api *APIClient) GetLedgers(userId, end int64) []*bitfinex.Ledger {
+func (api *APIClient) GetLedgers(userId, end int64) []*ledger.Ledger {
 	if api.CheckRateCount() != nil {
 		return nil
 	}
@@ -120,12 +122,12 @@ func (api *APIClient) GetLedgers(userId, end int64) []*bitfinex.Ledger {
 	return nil
 }
 
-func (api *APIClient) GetBook(precision bitfinex.BookPrecision) (bid []*bitfinex.BookUpdate, offer []*bitfinex.BookUpdate, err error) {
+func (api *APIClient) GetBook(precision common.BookPrecision) (bid []*book.Book, offer []*book.Book, err error) {
 	if api.CheckRateCount() != nil {
 		return
 	}
 
-	book, err := api.PublicClient.Book.All(bitfinex.FundingPrefix+"USD", precision, 100)
+	book, err := api.PublicClient.Book.All(common.FundingPrefix+"USD", precision, 100)
 
 	if err != nil {
 		logger.LOG.Errorf("Get book list: %s", err)
@@ -135,7 +137,7 @@ func (api *APIClient) GetBook(precision bitfinex.BookPrecision) (bid []*bitfinex
 	return book.Snapshot[0:100], book.Snapshot[100:], nil
 }
 
-func (api *APIClient) GetMatched(limit int) ([]*bitfinex.Trade, error) {
+func (api *APIClient) GetMatched(limit int) ([]*trade.Trade, error) {
 	if api.CheckRateCount() != nil {
 		return nil, nil
 	}
@@ -143,10 +145,10 @@ func (api *APIClient) GetMatched(limit int) ([]*bitfinex.Trade, error) {
 	fiveMin, _ := time.ParseDuration("-2h")
 
 	now := time.Now()
-	start := bitfinex.Mts(now.Add(fiveMin).UnixNano() / int64(time.Millisecond))
-	end := bitfinex.Mts(now.UnixNano() / int64(time.Millisecond))
+	start := common.Mts(now.Add(fiveMin).UnixNano() / int64(time.Millisecond))
+	end := common.Mts(now.UnixNano() / int64(time.Millisecond))
 
-	matchedList, err := api.PublicClient.Trades.PublicHistoryWithQuery(bitfinex.FundingPrefix+"USD", start, end, bitfinex.QueryLimit(limit), bitfinex.NewestFirst)
+	matchedList, err := api.PublicClient.Trades.PublicHistoryWithQuery(common.FundingPrefix+"USD", start, end, common.QueryLimit(limit), common.NewestFirst)
 
 	if err != nil {
 		logger.LOG.Errorf("Get Matched list: %v", err)
@@ -156,7 +158,7 @@ func (api *APIClient) GetMatched(limit int) ([]*bitfinex.Trade, error) {
 	return matchedList.Snapshot, nil
 }
 
-func (api *APIClient) GetOnOfferList(userId int64) []*bitfinex.Offer {
+func (api *APIClient) GetOnOfferList(userId int64) []*fundingoffer.Offer {
 	if api.CheckRateCount() != nil {
 		return nil
 	}
@@ -169,7 +171,8 @@ func (api *APIClient) GetOnOfferList(userId int64) []*bitfinex.Offer {
 
 	snap, err := client.Funding.Offers("fUSD")
 	if err != nil {
-		logger.LOG.Errorf("GetOnOfferList error : %v", err)
+
+		log.Printf("GetOnOfferList error : %v", err)
 		return nil
 	}
 
@@ -194,7 +197,7 @@ func (api *APIClient) SubmitFundingOffer(userId int64, symbol string, ffr bool, 
 		fundingType = "FRRDELTAVAR"
 	}
 
-	fo, err := client.Funding.SubmitOffer(&bitfinex.FundingOfferRequest{
+	fo, err := client.Funding.SubmitOffer(&fundingoffer.SubmitRequest{
 		Type:   fundingType,
 		Symbol: symbol,
 		Amount: amount,
@@ -206,7 +209,7 @@ func (api *APIClient) SubmitFundingOffer(userId int64, symbol string, ffr bool, 
 		logger.LOG.Errorf("Funding Offer Failed : %v", err)
 		return err
 	}
-	newOffer := fo.NotifyInfo.(*bitfinex.FundingOfferNew)
+	newOffer := fo.NotifyInfo.(*fundingoffer.Snapshot)
 	utils.PrintWithStruct(newOffer)
 	return nil
 }
@@ -217,8 +220,8 @@ func (api *APIClient) CancelFundingOffer(userId, offerId int64) {
 	}
 
 	if client := api.GetClientByUserId(userId); client != nil {
-		_, err := client.Funding.CancelOffer(&bitfinex.FundingOfferCancelRequest{
-			Id: offerId,
+		_, err := client.Funding.CancelOffer(&fundingoffer.CancelRequest{
+			ID: offerId,
 		})
 
 		if err != nil {

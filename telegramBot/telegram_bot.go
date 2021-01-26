@@ -1,7 +1,6 @@
 package telegramBot
 
 import (
-	"fmt"
 	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"log"
 	"os"
@@ -61,6 +60,7 @@ func BotInit() {
 		log.Printf("Authorized on account %s", bot.Self.UserName)
 	}
 
+	Listen()
 }
 
 func Listen() {
@@ -77,7 +77,7 @@ func Listen() {
 			if update.Message == nil { // ignore non-Message updates
 				continue
 			}
-			fmt.Println(update.Message.Command(), "!!",update.Message.CommandArguments(),"!!")
+
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 			switch update.Message.Command() {
 			case "register":

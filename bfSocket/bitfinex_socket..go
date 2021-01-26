@@ -1,14 +1,14 @@
 package bfSocket
 
 import (
+	"context"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/fundingoffer"
 	"log"
 	"os"
 	"robot/utils"
 	"time"
 
-	//"sync"
-
-	"github.com/bitfinexcom/bitfinex-api-go/v2"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/wallet"
 	//"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
 	"github.com/bitfinexcom/bitfinex-api-go/v2/websocket"
 )
@@ -51,15 +51,16 @@ func (st *Socket) Close() {
 	st.Client.Close()
 }
 
-func (st *Socket) Listen(updateWalletChan chan *bitfinex.WalletUpdate) {
+func (st *Socket) Listen(updateWalletChan chan *wallet.Update) {
 	go func() {
 		//wallet := policy.NewWallet()
 		for obj := range st.Client.Listen() {
 			switch obj.(type) {
 			case error:
 				log.Printf("Socket error: %v", obj.(error))
-			case *bitfinex.WalletUpdate:
-				walletStatus := obj.(*bitfinex.WalletUpdate)
+			//case *bitfinex.WalletUpdate:
+			case *wallet.Update:
+				walletStatus := obj.(*wallet.Update)
 				if walletStatus.Type == "funding" {
 					updateWalletChan <- walletStatus
 				}
@@ -67,20 +68,60 @@ func (st *Socket) Listen(updateWalletChan chan *bitfinex.WalletUpdate) {
 				//	//wallet.Update(walletStatus.Balance, walletStatus.BalanceAvailable)
 				//	updateWalletChan <- 1
 				//}
-
-			case *bitfinex.FundingOfferNew:
-			case *bitfinex.FundingOfferUpdate:
-			// 個人funding 交易 即時狀況
-			case *bitfinex.FundingTrade:
-				//fundingTrade := obj.(*bitfinex.FundingTrade)
-				//content, _ := utils.JsonString(fundingTrade)
-				//lineBot.LineSendMessage(content)
+			case *wallet.Snapshot:
+				walletSnapshot := obj.(*wallet.Snapshot)
+				for _, wallets := range walletSnapshot.Snapshot {
+					if wallets.Type == "funding" {
+						utils.PrintWithStruct(wallets)
+						newWalletUpdate := &wallet.Update{
+							Balance:          wallets.Balance,
+							BalanceAvailable: wallets.BalanceAvailable,
+						}
+						updateWalletChan <- newWalletUpdate
+					}
+				}
+			//case *fundingoffer.Snapshot:
+			//	fundingOffer := obj.(*fundingoffer.Snapshot)
+			//case *bitfinex.FundingOfferNew:
+			//case *bitfinex.FundingOfferUpdate:
+			//// 個人funding 交易 即時狀況
+			//case *bitfinex.FundingTrade:
+			//fundingTrade := obj.(*bitfinex.FundingTrade)
+			//content, _ := utils.JsonString(fundingTrade)
+			//lineBot.LineSendMessage(content)
 
 			default:
 				utils.PrintWithStruct(obj)
 			}
 		}
 	}()
+}
+
+func (st *Socket) SubmitFundingOffer(symbol string, amount float64, rate float64, day int64) error {
+	log.Printf("Submitting new funding offer")
+	err := st.Client.SubmitFundingOffer(context.Background(), &fundingoffer.SubmitRequest{
+		Type:   "LIMIT",
+		Symbol: symbol,
+		Amount: amount,
+		Rate:   rate,
+		Period: day,
+		Hidden: false,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return err
+}
+
+func (st *Socket) CancelFundingOffer(offerId int64) error {
+	log.Printf("Submitting cancel funding offer")
+	err := st.Client.SubmitFundingCancel(context.Background(), &fundingoffer.CancelRequest{
+		ID: offerId,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return err
 }
 
 //

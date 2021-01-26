@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bitfinexcom/bitfinex-api-go/v2"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/common"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/wallet"
 	"log"
 	"robot/bfApi"
 	"robot/bfSocket"
@@ -17,19 +18,19 @@ import (
 )
 
 type UserInfo struct {
-	TelegramId       int64 `json:"telegram_id"`
-	Config           *ConfigManage `json:"config"`
-	Key              string `json:"key"` // bitfinex api key
-	Sec              string  `json:"sec"`// bitfinex sec
-	Wallet           *Wallet `json:"-"`
-	API              *bfApi.APIClient `json:"-"`
-	BFSocket         *bfSocket.Socket `json:"-"`
-	NotifyChan       chan int `json:"-"`
-	UpdateWalletChan chan *bitfinex.WalletUpdate `json:"-"`
+	TelegramId       int64               `json:"telegram_id"`
+	Config           *ConfigManage       `json:"config"`
+	Key              string              `json:"key"` // bitfinex api key
+	Sec              string              `json:"sec"` // bitfinex sec
+	Wallet           *Wallet             `json:"-"`
+	API              *bfApi.APIClient    `json:"-"`
+	BFSocket         *bfSocket.Socket    `json:"-"`
+	NotifyChan       chan int            `json:"-"`
+	UpdateWalletChan chan *wallet.Update `json:"-"`
 
-	calculateCenter    *policy.CalculateCenter `json:"-"`
-	ctx    context.Context `json:"-"`
-	cancel context.CancelFunc `json:"-"`
+	CalculateCenter *policy.CalculateCenter `json:"-"`
+	ctx             context.Context         `json:"-"`
+	cancel          context.CancelFunc      `json:"-"`
 }
 
 //func (t *UserInfo) MarshalBinary() ([]byte, error) {
@@ -61,16 +62,30 @@ func NewUser(telegramId int64, key, sec string) *UserInfo {
 		API:              bfApi.NewAPIClient(),
 		BFSocket:         bfSocket.NewSocket(key, sec),
 		NotifyChan:       make(chan int),
-		UpdateWalletChan: make(chan *bitfinex.WalletUpdate),
-		calculateCenter: policy.NewCalculateCenter(),
+		UpdateWalletChan: make(chan *wallet.Update),
+		CalculateCenter:  policy.NewCalculateCenter(),
 	}
 
-	//instance.API.RegisterClient(telegramId, key, sec)
+	instance.API.RegisterClient(telegramId, key, sec)
 	instance.ctx, instance.cancel = context.WithCancel(context.Background())
-	//go instance.ListenWalletStatus()
-	//go instance.ListenOnFundingOffer()
+	go instance.ListenWalletStatus()
+	go instance.ListenOnFundingOffer()
 
 	return instance
+}
+
+func (t *UserInfo) StartActive() {
+	t.Wallet = NewWallet()
+	t.API = bfApi.NewAPIClient()
+	t.BFSocket = bfSocket.NewSocket(t.Key, t.Sec)
+	t.NotifyChan = make(chan int)
+	t.UpdateWalletChan = make(chan *wallet.Update)
+	t.CalculateCenter = policy.NewCalculateCenter()
+
+	t.API.RegisterClient(t.TelegramId, t.Key, t.Sec)
+	t.ctx, t.cancel = context.WithCancel(context.Background())
+	go t.ListenWalletStatus()
+	go t.ListenOnFundingOffer()
 }
 
 // 監聽 wallet 狀況
@@ -85,7 +100,7 @@ func (t *UserInfo) ListenWalletStatus() {
 		// 放貸天數
 		day := t.Config.GetDay()
 		// 計算放貸利率
-		rate := t.calculateCenter.CalculateRateByConfig(t.Config.GetWeights())
+		rate := t.CalculateCenter.CalculateRateByConfig(t.Config.GetWeights())
 
 		bottomRate := t.Config.GetBottomRate()
 		if rate <= bottomRate {
@@ -97,12 +112,14 @@ func (t *UserInfo) ListenWalletStatus() {
 		fixedAmount := t.Config.GetFixedAmount()
 		amount := t.Wallet.GetAmount(fixedAmount)
 		for amount >= 50 {
-			if rate >= t.Config.GetCrazyRate() {
-				day = 30
-			}
+			day = t.Config.GetDayByRate(rate)
+			//if rate >= t.Config.GetCrazyRate() {
+			//	day = 30
+			//}
 
 			logger.LOG.Infof("Calculate Rate : %v, wallet %v", rate, walletUpdate)
-			err := t.API.SubmitFundingOffer(t.TelegramId, bitfinex.FundingPrefix+"USD", false, amount, rate, int64(day))
+			err := t.BFSocket.SubmitFundingOffer(common.FundingPrefix+"USD", amount, rate, int64(day))
+			//err := t.API.SubmitFundingOffer(t.TelegramId, common.FundingPrefix+"USD", false, amount, rate, int64(day))
 			if err != nil {
 				logger.LOG.Errorf("UserId [%d] Submit Offer Error: [%v]", t.TelegramId, err)
 				break
@@ -178,9 +195,10 @@ loop:
 						t.Config.SetWeights("book03", -1)
 						t.Config.SetWeights("book01", 1)
 						t.Config.SetWeights("avg100", 1)
-						t.API.CancelFundingOffer(t.TelegramId, offer.ID)
+						//t.API.CancelFundingOffer(t.TelegramId, offer.ID)
+						t.BFSocket.CancelFundingOffer(offer.ID)
 						lastUnMatchTimeStamp = now.Unix()
-						go s2c.SendMessage(t.TelegramId, fmt.Sprintf("單號:%d Rate: %f Day: %d ,..超過%d分鐘未撮合, 今日已累積未搓合次數:%d", offer.ID, offer.Rate, offer.Period, cancelTime,unMatchCount))
+						go s2c.SendMessage(t.TelegramId, fmt.Sprintf("單號:%d Rate: %f Day: %d ,..超過%d分鐘未撮合, 今日已累積未搓合次數:%d", offer.ID, offer.Rate, offer.Period, cancelTime, unMatchCount))
 					}
 				}
 			}

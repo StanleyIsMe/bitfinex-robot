@@ -2,7 +2,9 @@ package policy
 
 import (
 	"context"
-	"github.com/bitfinexcom/bitfinex-api-go/v2"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/book"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/common"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/trade"
 	"os"
 	"robot/bfApi"
 	"robot/logger"
@@ -48,9 +50,9 @@ func (center *CalculateCenter) GetMarketPrice() map[string]float64 {
 		return center.AvgPriceMap
 	}
 
-	bidListP0, offerListP0, err0 := center.apiClient.GetBook(bitfinex.Precision0)
-	_, offerListP1, err1 := center.apiClient.GetBook(bitfinex.Precision1)
-	_, offerListP2, err2 := center.apiClient.GetBook(bitfinex.Precision2)
+	bidListP0, offerListP0, err0 := center.apiClient.GetBook(common.Precision0)
+	_, offerListP1, err1 := center.apiClient.GetBook(common.Precision1)
+	_, offerListP2, err2 := center.apiClient.GetBook(common.Precision2)
 	matchedList, err := center.apiClient.GetMatched(10000)
 	if err != nil || err0 != nil || err1 != nil || err2 != nil || len(bidListP0) == 0 {
 		logger.LOG.Error("計算市場利率發生錯誤:", err, err0, err1, err2)
@@ -87,6 +89,7 @@ loop:
 
 func (center *CalculateCenter) CalculateRateByConfig(weights map[string]int) float64{
 	marketRateMap := center.GetMarketPrice()
+
 	if marketRateMap == nil {
 		return 0
 	}
@@ -190,12 +193,11 @@ func (center *CalculateCenter) CalculateRateByConfig(weights map[string]int) flo
 //	return allAvg
 //}
 
-
-func excueBookAvg(list []*bitfinex.BookUpdate, inValidRate float64) (average float64) {
+func excueBookAvg(list []*book.Book, inValidRate float64) (average float64) {
 	var count float64
 	for _, data := range list {
-		if data.Price > inValidRate {
-			average += data.Price
+		if data.Rate > inValidRate {
+			average += data.Rate
 			count++
 		}
 	}
@@ -206,11 +208,11 @@ func excueBookAvg(list []*bitfinex.BookUpdate, inValidRate float64) (average flo
 	return average / count
 }
 
-func excueMatchedAvg(list []*bitfinex.Trade, inValidRate float64) (average float64) {
+func excueMatchedAvg(list []*trade.Trade, inValidRate float64) (average float64) {
 	var count float64
 	for _, data := range list {
-		if data.Price > inValidRate {
-			average += data.Price
+		if data.Rate > inValidRate {
+			average += data.Rate
 			count++
 		}
 	}
