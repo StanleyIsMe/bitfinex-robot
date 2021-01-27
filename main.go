@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"robot/crontab"
 	"robot/user"
 	"robot/utils/s2c"
 	"syscall"
@@ -43,7 +44,7 @@ func main() {
 	//telegramBot.Listen()
 	//bfApi.ApiInit()
 	//bfSocket.SocketInit()
-	//crontab.Start()
+	crontab.Start()
 
 
 	router := gin.Default()

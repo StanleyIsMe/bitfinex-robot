@@ -181,6 +181,8 @@ loop:
 				t.Config.WeightsInit()
 			}
 
+			// sync wallet info
+			t.BFSocket.CalWalletUpdate()
 			onOfferList := t.API.GetOnOfferList(t.TelegramId)
 
 			if onOfferList != nil {
