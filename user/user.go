@@ -210,6 +210,6 @@ loop:
 	}
 }
 
-func (t *UserInfo) SubmitOrder() {
-
+func (t *UserInfo) GetFundingRate() float64 {
+	return t.CalculateCenter.CalculateRateByConfig(t.Config.GetWeights())
 }

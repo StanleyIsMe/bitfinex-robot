@@ -4,7 +4,6 @@ import (
 	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"log"
 	"os"
-	"robot/config_manage"
 	"robot/handler"
 	"strconv"
 	"strings"
@@ -88,6 +87,21 @@ func Listen() {
 				}
 				msg.Text = handler.RegisterHandle(update.Message.Chat.ID, args[0], args[1])
 				break
+			case "rate":
+				msg.Text = handler.CalculateRateHandle(update.Message.Chat.ID)
+				break
+			case "config":
+				args := strings.Split(update.Message.CommandArguments(), ":")
+				if len(args) != 2 {
+					msg.Text = "請輸入正確格式: /config [key]:[value]"
+					break
+				}
+
+				msg.Text = handler.UpdateConfigHandle(update.Message.Chat.ID, args[0], args[1])
+				break
+			case "config_info":
+				msg.Text = handler.LookConfig(update.Message.Chat.ID)
+				break
 			}
 
 			//switch update.Message.Text {
@@ -159,46 +173,7 @@ func parseText(input string) (string, string) {
 	}
 }
 
-func ReplyAction(key, val string) (reply string) {
-	if val == "" || key == "" {
-		return "找不到對應動作"
-	}
 
-	reply = "執行完畢"
-	switch key {
-	case "CrazyRate":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetCrazyRate(rate)
-		break
-	case "IncreaseRate":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetIncreaseRate(rate)
-		break
-	case "BottomRate":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetBottomRate(rate)
-		break
-	case "FixedAmount":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetFixedAmount(rate)
-		break
-	case "InValidRate":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetInValidRate(rate)
-		break
-	case "Day":
-		day, _ := strconv.Atoi(val)
-		config_manage.Config.SetDay(day)
-		break
-	case "SubmitOffer":
-		config_manage.Config.SetSubmitOffer(val == "Y" || val == "y")
-		break
-	default:
-		reply = "找不到對應動作"
-	}
-
-	return reply
-}
 
 type DailyInterestReport struct {
 	Balance       float64                  `json:"錢包總額"`
