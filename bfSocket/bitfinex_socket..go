@@ -61,7 +61,7 @@ func (st *Socket) Listen(updateWalletChan chan *wallet.Update) {
 			//case *bitfinex.WalletUpdate:
 			case *wallet.Update:
 				walletStatus := obj.(*wallet.Update)
-				if walletStatus.Type == "funding" {
+				if walletStatus.Type == "funding" && walletStatus.Currency == "USD" {
 					updateWalletChan <- walletStatus
 				}
 				//if walletStatus.BalanceAvailable >= 50 && walletStatus.Type == "funding" {
@@ -71,7 +71,7 @@ func (st *Socket) Listen(updateWalletChan chan *wallet.Update) {
 			case *wallet.Snapshot:
 				walletSnapshot := obj.(*wallet.Snapshot)
 				for _, wallets := range walletSnapshot.Snapshot {
-					if wallets.Type == "funding" {
+					if wallets.Type == "funding" && wallets.Currency == "USD"{
 						utils.PrintWithStruct(wallets)
 						newWalletUpdate := &wallet.Update{
 							Balance:          wallets.Balance,
@@ -125,7 +125,7 @@ func (st *Socket) CancelFundingOffer(offerId int64) error {
 }
 
 func (st *Socket) CalWalletUpdate() {
-	msg := []interface{}{0, "calc", nil, [][]string{{"wallet_funding_fUSD"}}}
+	msg := []interface{}{0, "calc", nil, [][]string{{"wallet_funding_USD"}}}
 	err := st.Client.Send(context.Background(), msg)
 
 	if err != nil {

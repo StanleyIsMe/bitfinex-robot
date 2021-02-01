@@ -18,11 +18,11 @@ type ConfigManage struct {
 	IncreaseRate  float64 `json:"increase_rate"` //遞增利率"`
 	TelegramId    int64 `json:"telegram_id"`
 	SubmitOffer   bool            `json:"submit_offer"` //自動放貸"`
-	InValidRate   float64         `json:"in_valid_rate"` //無效利率"`
+	InvalidRate   float64         `json:"invalid_rate"` //無效利率"`
 	CrazyDayRange map[int]float64 `json:"crazy_day_range"`
 	Weights       map[string]int  `json:"weights"` //利率計算權重"`
 
-	AutoCancelReLendTime int64 `json:"auto_cancel_re_lend_time"`
+	AutoCancelTime int64 `json:"auto_cancel_time"`
 	OfficialMaxDay       int `json:"official_max_day"`
 	OfficialMinDay       int `json:"official_min_day"`
 }
@@ -64,7 +64,7 @@ func NewConfig() *ConfigManage {
 		IncreaseRate:  increaseRate,
 		TelegramId:    telegramId,
 		SubmitOffer:   submitOffer,
-		InValidRate:   invalidRate,
+		InvalidRate:   invalidRate,
 		CrazyDayRange: crazyDayRange,
 		Weights: map[string]int{
 			"book01":   1,
@@ -76,7 +76,7 @@ func NewConfig() *ConfigManage {
 
 		OfficialMaxDay: maxDay,
 		OfficialMinDay: minDay,
-		AutoCancelReLendTime: reLendTime,
+		AutoCancelTime: reLendTime,
 	}
 }
 
@@ -114,10 +114,10 @@ func (config *ConfigManage) GetIncreaseRate() float64 {
 	return config.IncreaseRate
 }
 
-func (config *ConfigManage) GetInValidRate() float64 {
+func (config *ConfigManage) GetInvalidRate() float64 {
 	config.Lock()
 	defer config.Unlock()
-	return config.InValidRate
+	return config.InvalidRate
 }
 
 func (config *ConfigManage) GetSubmitOffer() bool {
@@ -154,7 +154,7 @@ func (config *ConfigManage) GetDayByRate(rate float64) int {
 func (config *ConfigManage) GetAutoCancelTime() int64 {
 	config.Lock()
 	defer config.Unlock()
-	return config.AutoCancelReLendTime
+	return config.AutoCancelTime
 }
 
 func (config *ConfigManage) SetBottomRate(rate float64) {
@@ -196,7 +196,7 @@ func (config *ConfigManage) SetSubmitOffer(submit bool) {
 func (config *ConfigManage) SetInValidRate(rate float64) {
 	config.Lock()
 	defer config.Unlock()
-	config.InValidRate = rate
+	config.InvalidRate = rate
 }
 
 func (config *ConfigManage) SetWeights(key string, increment int) {
@@ -234,7 +234,7 @@ func (config *ConfigManage) SetAutoCancelTime(cancelTime int64) {
 	config.Lock()
 	defer config.Unlock()
 	if cancelTime >= 10 {
-		config.AutoCancelReLendTime = cancelTime
+		config.AutoCancelTime = cancelTime
 	}
 }
 

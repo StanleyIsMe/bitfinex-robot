@@ -9,6 +9,7 @@ import (
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/fundingoffer"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/ledger"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/trade"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/wallet"
 	"log"
 	"os"
 	"sync"
@@ -40,9 +41,9 @@ func NewAPIClient() *APIClient {
 		url := os.Getenv("BFX_API_URI")
 		pubClient := rest.NewClientWithURL(url).Credentials(os.Getenv("API_KEY"), os.Getenv("API_SEC"))
 		APIClientInstance = &APIClient{
-			rateCount:  10,
-			ClientList: make(map[int64]*rest.Client, 0),
-			PublicClient:pubClient,
+			rateCount:    10,
+			ClientList:   make(map[int64]*rest.Client, 0),
+			PublicClient: pubClient,
 		}
 
 		APIClientInstance.ctx, APIClientInstance.cancel = context.WithCancel(context.Background())
@@ -111,9 +112,9 @@ func (api *APIClient) GetLedgers(userId, end int64) []*ledger.Ledger {
 	}
 
 	if client := api.GetClientByUserId(userId); client != nil {
-		result, err := client.Ledgers.Ledgers("USD", 0, end, 500)
+		result, err := client.Ledgers.Ledgers("USD", 0, end, 2500)
 		if err != nil {
-			logger.LOG.Errorf("getting Ledgers: %s", err)
+			log.Printf("getting Ledgers: %s", err)
 			return nil
 		}
 
@@ -228,4 +229,20 @@ func (api *APIClient) CancelFundingOffer(userId, offerId int64) {
 			logger.LOG.Errorf("Cancel offer error : %v", offerId)
 		}
 	}
+}
+
+func (api *APIClient) Wallets(userId int64) *wallet.Snapshot {
+	if api.CheckRateCount() != nil {
+		return nil
+	}
+
+	if client := api.GetClientByUserId(userId); client != nil {
+		response, err := client.Wallet.Wallet()
+
+		if err != nil {
+			logger.LOG.Errorf("Wallets error : %v", err)
+		}
+		return response
+	}
+	return nil
 }

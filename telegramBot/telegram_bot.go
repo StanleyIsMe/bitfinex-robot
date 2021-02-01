@@ -80,9 +80,9 @@ func Listen() {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 			switch update.Message.Command() {
 			case "register":
-				args := strings.Split(update.Message.CommandArguments(), "/")
+				args := parseText(update.Message.CommandArguments())
 				if len(args) != 2 {
-					msg.Text = "請輸入正確格式: /register [token]/[password]"
+					msg.Text = "請輸入正確格式: /register [token]:[password]"
 					break
 				}
 				msg.Text = handler.RegisterHandle(update.Message.Chat.ID, args[0], args[1])
@@ -90,18 +90,33 @@ func Listen() {
 			case "rate":
 				msg.Text = handler.CalculateRateHandle(update.Message.Chat.ID)
 				break
-			case "config":
-				args := strings.Split(update.Message.CommandArguments(), ":")
+			case "set":
+				args := parseText(update.Message.CommandArguments())
 				if len(args) != 2 {
-					msg.Text = "請輸入正確格式: /config [key]:[value]"
+					msg.Text = "請輸入正確格式: /set [key]:[value]"
 					break
 				}
 
 				msg.Text = handler.UpdateConfigHandle(update.Message.Chat.ID, args[0], args[1])
 				break
-			case "config_info":
+			case "config":
 				msg.Text = handler.LookConfig(update.Message.Chat.ID)
 				break
+			case "interest":
+				msg.Text = handler.GetInterest(update.Message.Chat.ID)
+				break
+			case "help":
+				msg.Text = ` /register \[token]:\[password]  //註冊放貸機器人
+/set \[key]:\[value] //更新機器人設定 
+/config //查看機器人設定 
+/interest //查看利息所得 
+`
+				msg.ParseMode = tgbotapi.ModeMarkdown
+				break
+
+			//case "wallets":
+			//	msg.Text = handler.Wallets(update.Message.Chat.ID)
+			//	break
 			}
 
 			//switch update.Message.Text {
@@ -157,67 +172,19 @@ func Close() {
 	bot.StopReceivingUpdates()
 }
 
-func parseText(input string) (string, string) {
+func parseText(input string) []string {
 	input = strings.Replace(input, " ", "", -1)
-	split := strings.Split(input, ":")
+	return strings.Split(input, ":")
 
-	switch len(split) {
-	case 0:
-		return "", ""
-	case 1:
-		return split[0], ""
-	case 2:
-		return split[0], split[1]
-	default:
-		return "", ""
-	}
+	//switch len(split) {
+	//case 0:
+	//	return "", ""
+	//case 1:
+	//	return split[0], ""
+	//case 2:
+	//	return split[0], split[1]
+	//default:
+	//	return "", ""
+	//}
 }
 
-
-
-type DailyInterestReport struct {
-	Balance       float64                  `json:"錢包總額"`
-	TotalInterest float64                  `json:"利息總額"`
-	InterestList  []map[string]interface{} `json:"利息清單"`
-}
-
-// 取得近十天的利息
-//func GetInterestInfo() string {
-//	report := &DailyInterestReport{}
-//
-//	end := time.Now().UnixNano() / int64(time.Millisecond)
-//	list := bfApi.GetLedgers(end)
-//	count := 0
-//	for len(list) > 0 {
-//		for _, data := range list {
-//
-//			if data.Description == "Margin Funding Payment on wallet funding" {
-//				count++
-//
-//				// 第一筆為總金額
-//				if count == 1 {
-//					report.Balance = data.Balance
-//				}
-//
-//				report.TotalInterest += data.Amount
-//
-//				if count > 10 {
-//					continue
-//				}
-//				earnInfo := map[string]interface{}{}
-//				dateTime := time.Unix(data.MTS/1000, 0).Format("2006-01-02 15:04:05")
-//				earnInfo["Date"] = dateTime
-//				earnInfo["Interest"] = data.Amount
-//				report.InterestList = append(report.InterestList, earnInfo)
-//			}
-//			end = data.MTS
-//		}
-//
-//		list = bfApi.GetLedgers(end - 1)
-//	}
-//
-//	content, _ := utils.JsonString(report)
-//	//ServerMessage(content)
-//	log.Print("Get Interest Info Done")
-//	return content
-//}

@@ -46,49 +46,42 @@ func UpdateConfigHandle(telegramId int64, key, value string) (reply string) {
 	defer func() {
 		if err := recover(); err != nil {
 			logger.LOG.WithFields(logrus.Fields{
-				"key": key,
+				"key":   key,
 				"value": value,
 			}).Errorf("UpdateConfigHandle Panic : %v", err)
 			reply = "操作失敗"
 		}
 	}()
 
-	user := user.GetInstance().GetUserById(telegramId)
-	if user == nil {
+	member := user.GetInstance().GetUserById(telegramId)
+	if member == nil {
 		return "用戶未註冊"
 	}
-	config := user.Config
+	config := member.Config
 	reply = "成功"
 	switch key {
-	case "IncreaseRate":
+	case "increase_rate":
 		rate, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			panic(err)
 		}
 		config.SetIncreaseRate(rate)
 		break
-	case "BottomRate":
+	case "bottom_rate":
 		rate, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			panic(err)
 		}
 		config.SetBottomRate(rate)
 		break
-	case "FixedAmount":
+	case "fixed_amount":
 		rate, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			panic(err)
 		}
 		config.SetFixedAmount(rate)
 		break
-	case "InValidRate":
-		rate, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			panic(err)
-		}
 
-		config.SetInValidRate(rate)
-		break
 	case "Day":
 		day, err := strconv.Atoi(value)
 		if err != nil {
@@ -97,22 +90,26 @@ func UpdateConfigHandle(telegramId int64, key, value string) (reply string) {
 
 		config.SetDay(day)
 		break
-	case "SubmitOffer":
+	case "submit_offer":
 		config.SetSubmitOffer(value == "Y" || value == "y")
 		break
-	case "CrazyDayRange":
+	case "crazy_day_range":
 		config.SetCrazyDayRange(value)
-	case "AutoCancelTime":
-		cancelTime, err :=strconv.ParseInt(value,10, 64)
+	case "auto_cancel_time":
+		cancelTime, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			panic(err)
 		}
 
 		config.SetAutoCancelTime(cancelTime)
 	default:
-		reply = "找不到對應動作"
+		return "找不到對應動作"
 	}
-	return reply
+
+	if err := user.GetInstance().UpdateById(telegramId); err != nil {
+		return "操作失敗"
+	}
+	return
 }
 
 func LookConfig(telegramId int64) string {
@@ -128,4 +125,36 @@ func LookConfig(telegramId int64) string {
 	} else {
 		return "用戶未註冊"
 	}
+}
+
+func GetInterest(telegramId int64) string {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.LOG.Errorf("GetInterest Panic : %v", err)
+		}
+	}()
+
+	user := user.GetInstance().GetUserById(telegramId)
+	if user == nil {
+		return "用戶未註冊"
+	}
+
+	result := user.GetInterest()
+	content, _ := utils.JsonString(result)
+	return content
+}
+
+func Wallets(telegramId int64) string {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.LOG.Errorf("GetInterest Panic : %v", err)
+		}
+	}()
+
+	user := user.GetInstance().GetUserById(telegramId)
+	if user == nil {
+		return "用戶未註冊"
+	}
+	utils.PrintWithStruct(user.API.Wallets(user.TelegramId))
+	return  "成功"
 }

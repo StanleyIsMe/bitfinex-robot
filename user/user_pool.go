@@ -2,13 +2,13 @@ package user
 
 import (
 	"errors"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"os"
 	"robot/logger"
 	"strconv"
 	"sync"
 
-	//"robot/utils"
 	"robot/utils/redis"
 )
 
@@ -75,31 +75,12 @@ func (pool *Pool) RegisterUser(telegramId int64, key, sec string) error {
 		return errors.New("已註冊過")
 	}
 
-	//var user UserInfo
-	//if err := user.BinaryUnmarshaler([]byte(result)); err != nil {
-	//	return err
-	//}
-
 	newuser := NewUser(telegramId, key, sec)
-
+	//utils.PrintWithStruct(newuser.API.Wallets(telegramId), "!!!!!!!!")
 	if err := redis.HSET(UserKey, telegramIdStr, newuser); err != nil {
 		return err
 	}
 
-	//result2, err := redis.HGET(UserKey, telegramIdStr)
-	//if err != nil {
-	//	fmt.Println(err, "!!!")
-	//	return err
-	//}
-	//
-	//us := &UserInfo{}
-	//if err := us.UnmarshalBinary([]byte(result2)); err != nil {
-	//	fmt.Println(err, "!!!")
-	//	return err
-	//}
-	//
-	//utils.PrintWithStruct(us)
-	//fmt.Println("==========================")
 	pool.UserList[telegramId] = newuser
 	return nil
 }
@@ -137,4 +118,18 @@ func (pool *Pool) GetUserById(telegramId int64) *UserInfo {
 func (pool *Pool) SetManageUser() {
 	userId, _ := strconv.ParseInt(os.Getenv("TELEGRAM_MANAGE_ID"), 10, 64)
 	pool.RegisterUser(userId, os.Getenv("API_KEY"), os.Getenv("API_SEC"))
+}
+
+func (pool *Pool) UpdateById(telegramId int64) error {
+	telegramIdStr := strconv.Itoa(int(telegramId))
+	user := pool.GetUserById(telegramId)
+	if user == nil {
+		return errors.New(fmt.Sprintf("User Id [%d] Not Found", telegramId))
+	}
+
+	if err := redis.HSET(UserKey, telegramIdStr, user); err != nil {
+		logger.LOG.Errorf("UpdateById Error %v", err)
+		return err
+	}
+	return nil
 }

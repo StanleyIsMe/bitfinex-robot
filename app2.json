@@ -1,0 +1,12 @@
+{
+    "apps": [
+        {
+            "name": "robot",
+            "script": "go run main.go",
+            "exec_interpreter": "",
+            "exec_mode": "fork",
+            "cron_restart": "0 0 * * 0",
+            "autorestart": false
+        }
+    ]
+}

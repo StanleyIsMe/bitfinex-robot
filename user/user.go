@@ -10,7 +10,9 @@ import (
 	"robot/bfApi"
 	"robot/bfSocket"
 	"robot/logger"
+	"robot/model"
 	"robot/policy"
+	"robot/utils"
 	"robot/utils/s2c"
 	"runtime/debug"
 	"sync"
@@ -81,7 +83,7 @@ func (t *UserInfo) StartActive() {
 	t.NotifyChan = make(chan int)
 	t.UpdateWalletChan = make(chan *wallet.Update)
 	t.CalculateCenter = policy.NewCalculateCenter()
-
+	t.Config.WeightsInit()
 	t.API.RegisterClient(t.TelegramId, t.Key, t.Sec)
 	t.ctx, t.cancel = context.WithCancel(context.Background())
 	go t.ListenWalletStatus()
@@ -127,24 +129,6 @@ func (t *UserInfo) ListenWalletStatus() {
 			rate += t.Config.GetIncreaseRate()
 			amount = t.Wallet.GetAmount(fixedAmount)
 		}
-
-		//logger.LOG.Infof("Calculate Rate : %v, sign %v", rate, j)
-
-		//if config_manage.Config.GetSubmitOffer() {
-		//	for wallet.BalanceAvailable >= 50 {
-		//		if rate >= config_manage.Config.GetCrazyRate() {
-		//			day = 30
-		//		}
-		//		fixedAmount := config_manage.Config.GetFixedAmount()
-		//		amount := wallet.GetAmount(fixedAmount)
-		//		err := bfApi.SubmitFundingOffer(bitfinex.FundingPrefix+"USD", false, amount, rate, int64(day))
-		//		if err != nil {
-		//			logger.LOG.Errorf("Submit Offer Error: %v", err)
-		//			break
-		//		}
-		//		rate += config_manage.Config.GetIncreaseRate()
-		//	}
-		//}
 	}
 }
 
@@ -183,6 +167,19 @@ loop:
 
 			// sync wallet info
 			t.BFSocket.CalWalletUpdate()
+			if ws := t.API.Wallets(t.TelegramId); ws != nil {
+				for _, wallets := range ws.Snapshot {
+					if wallets.Type == "funding" && wallets.Currency == "USD"{
+						utils.PrintWithStruct(wallets)
+						newWalletUpdate := &wallet.Update{
+							Balance:          wallets.Balance,
+							BalanceAvailable: wallets.BalanceAvailable,
+						}
+						t.UpdateWalletChan <- newWalletUpdate
+					}
+				}
+			}
+
 			onOfferList := t.API.GetOnOfferList(t.TelegramId)
 
 			if onOfferList != nil {
@@ -212,4 +209,41 @@ loop:
 
 func (t *UserInfo) GetFundingRate() float64 {
 	return t.CalculateCenter.CalculateRateByConfig(t.Config.GetWeights())
+}
+
+func (t *UserInfo) GetInterest() *model.DailyInterestReport {
+	report := &model.DailyInterestReport{}
+
+	end := time.Now().UnixNano() / int64(time.Millisecond)
+	list := t.API.GetLedgers(t.TelegramId, end)
+	count := 0
+	for len(list) > 0 {
+		for _, data := range list {
+
+			if data.Description == "Margin Funding Payment on wallet funding" {
+				count++
+
+				// 第一筆為總金額
+				if count == 1 {
+					report.Balance = data.Balance
+				}
+
+				report.TotalInterest += data.Amount
+
+				if count > 10 {
+					continue
+				}
+				earnInfo := map[string]interface{}{}
+				dateTime := time.Unix(data.MTS/1000, 0).Format("2006-01-02 15:04:05")
+				earnInfo["Date"] = dateTime
+				earnInfo["Interest"] = data.Amount
+				report.InterestList = append(report.InterestList, earnInfo)
+			}
+			end = data.MTS
+		}
+
+		list = t.API.GetLedgers(t.TelegramId, end-1)
+	}
+
+	return report
 }

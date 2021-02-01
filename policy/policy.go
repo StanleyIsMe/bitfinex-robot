@@ -126,6 +126,9 @@ func (center *CalculateCenter) CalculateRateByConfig(weights map[string]int) flo
 	return allAvg
 }
 
+//func (center *CalculateCenter) MonitorComingSoonHighRate() {
+//
+//}
 //func TrackMatchPrice() float64 {
 //	log.Println("Use TrackMatchPrice Policy")
 //
