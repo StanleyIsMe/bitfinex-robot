@@ -6,6 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"robot/logger"
+	"robot/utils/s2c"
 	"strconv"
 	"sync"
 
@@ -14,6 +15,7 @@ import (
 
 const (
 	UserKey = "user"
+	NotifyKey = "notify"
 )
 
 var UserPool *Pool
@@ -132,4 +134,10 @@ func (pool *Pool) UpdateById(telegramId int64) error {
 		return err
 	}
 	return nil
+}
+
+func (pool *Pool) BroadcastMsg(message string) {
+	for userId, _ :=  range pool.UserList {
+		s2c.SendMessage(userId, message)
+	}
 }

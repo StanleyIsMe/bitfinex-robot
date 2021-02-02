@@ -2,6 +2,7 @@ package redis
 
 import (
 	"os"
+	"time"
 
 	"github.com/go-redis/redis/v7"
 	"github.com/sirupsen/logrus"
@@ -52,21 +53,6 @@ func HSET(key, field string, values interface{}) error {
 		return err
 	}
 	return nil
-	//err = client.HMSet("htest", aa).Err()
-	////client.HGetAll("htest").Result()
-	//fmt.Println(err,11111111)
-	//
-	//
-	////ree := make(map[string]*Test, 0)
-	//var ts Test
-	//result, err := client.HMGet("htest", "11", "22").Result()
-	////
-	//////err = utils.Decode([]byte(v), userModel)
-
-	//fmt.Println(err, result)
-
-	//msgpack.Unmarshal(result, &ts)
-	//fmt.Println(ts)
 }
 
 func HGET(key, field string) (string, error) {
@@ -93,10 +79,29 @@ func HGetAll(key string) (map[string]string, error) {
 		return nil, err
 	}
 	return result, nil
-	//for _, val := range result {
-	//	msgpack.Unmarshal([]byte(val.(string)), &ts)
-	//	fmt.Println(ts.Id, ts.Name)
-	//}
+}
+
+func SetNX(key string, value interface{}, expiration time.Duration) bool {
+	result, err := redisClient.conn.SetNX(key, value, expiration).Result()
+	if err != nil {
+		redisClient.log.Errorf("Redis SetNX Error : %v", err)
+		return false
+	}
+	return result
+}
+
+func Get(key string) (string, error) {
+	result, err := redisClient.conn.Get(key).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+
+	if err != nil {
+		redisClient.log.Errorf("Redis Get Error : %v", err)
+		return "", err
+	}
+
+	return result, nil
 }
 
 //

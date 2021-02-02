@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/common"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/ticker"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/wallet"
 	"log"
 	"robot/bfApi"
@@ -12,7 +13,7 @@ import (
 	"robot/logger"
 	"robot/model"
 	"robot/policy"
-	"robot/utils"
+	"robot/utils/redis"
 	"robot/utils/s2c"
 	"runtime/debug"
 	"sync"
@@ -20,15 +21,15 @@ import (
 )
 
 type UserInfo struct {
-	TelegramId       int64               `json:"telegram_id"`
-	Config           *ConfigManage       `json:"config"`
-	Key              string              `json:"key"` // bitfinex api key
-	Sec              string              `json:"sec"` // bitfinex sec
-	Wallet           *Wallet             `json:"-"`
-	API              *bfApi.APIClient    `json:"-"`
-	BFSocket         *bfSocket.Socket    `json:"-"`
-	NotifyChan       chan int            `json:"-"`
-	UpdateWalletChan chan *wallet.Update `json:"-"`
+	TelegramId  int64            `json:"telegram_id"`
+	Config      *ConfigManage    `json:"config"`
+	Key         string           `json:"key"` // bitfinex api key
+	Sec         string           `json:"sec"` // bitfinex sec
+	Wallet      *Wallet          `json:"-"`
+	API         *bfApi.APIClient `json:"-"`
+	BFSocket    *bfSocket.Socket `json:"-"`
+	NotifyChan  chan int         `json:"-"`
+	MessageChan chan interface{} `json:"-"`
 
 	CalculateCenter *policy.CalculateCenter `json:"-"`
 	ctx             context.Context         `json:"-"`
@@ -56,16 +57,16 @@ func (t *UserInfo) UnmarshalBinary(data []byte) error {
 
 func NewUser(telegramId int64, key, sec string) *UserInfo {
 	instance := &UserInfo{
-		TelegramId:       telegramId,
-		Config:           NewConfig(),
-		Key:              key,
-		Sec:              sec,
-		Wallet:           NewWallet(),
-		API:              bfApi.NewAPIClient(),
-		BFSocket:         bfSocket.NewSocket(key, sec),
-		NotifyChan:       make(chan int),
-		UpdateWalletChan: make(chan *wallet.Update),
-		CalculateCenter:  policy.NewCalculateCenter(),
+		TelegramId:      telegramId,
+		Config:          NewConfig(),
+		Key:             key,
+		Sec:             sec,
+		Wallet:          NewWallet(),
+		API:             bfApi.NewAPIClient(),
+		BFSocket:        bfSocket.NewSocket(key, sec),
+		NotifyChan:      make(chan int),
+		MessageChan:     make(chan interface{}),
+		CalculateCenter: policy.NewCalculateCenter(),
 	}
 
 	instance.API.RegisterClient(telegramId, key, sec)
@@ -81,7 +82,7 @@ func (t *UserInfo) StartActive() {
 	t.API = bfApi.NewAPIClient()
 	t.BFSocket = bfSocket.NewSocket(t.Key, t.Sec)
 	t.NotifyChan = make(chan int)
-	t.UpdateWalletChan = make(chan *wallet.Update)
+	t.MessageChan = make(chan interface{})
 	t.CalculateCenter = policy.NewCalculateCenter()
 	t.Config.WeightsInit()
 	t.API.RegisterClient(t.TelegramId, t.Key, t.Sec)
@@ -92,42 +93,33 @@ func (t *UserInfo) StartActive() {
 
 // 監聽 wallet 狀況
 func (t *UserInfo) ListenWalletStatus() {
-	t.BFSocket.Listen(t.UpdateWalletChan)
-	for walletUpdate := range t.UpdateWalletChan {
-		t.Wallet.Update(walletUpdate.Balance, walletUpdate.BalanceAvailable)
-		if walletUpdate.BalanceAvailable < 50 || t.Config.GetSubmitOffer() == false {
-			continue
-		}
+	t.BFSocket.Listen(t.MessageChan)
+	warningVolume := 20000000.0
 
-		// 放貸天數
-		day := t.Config.GetDay()
-		// 計算放貸利率
-		rate := t.CalculateCenter.CalculateRateByConfig(t.Config.GetWeights())
+	for msg := range t.MessageChan {
 
-		bottomRate := t.Config.GetBottomRate()
-		if rate <= bottomRate {
-			log.Println("計算結果 %v 低於最低利率 %v: ", rate, bottomRate)
-			rate = bottomRate
-			return
-		}
-
-		fixedAmount := t.Config.GetFixedAmount()
-		amount := t.Wallet.GetAmount(fixedAmount)
-		for amount >= 50 {
-			day = t.Config.GetDayByRate(rate)
-			//if rate >= t.Config.GetCrazyRate() {
-			//	day = 30
-			//}
-
-			logger.LOG.Infof("Calculate Rate : %v, wallet %v", rate, walletUpdate)
-			err := t.BFSocket.SubmitFundingOffer(common.FundingPrefix+"USD", amount, rate, int64(day))
-			//err := t.API.SubmitFundingOffer(t.TelegramId, common.FundingPrefix+"USD", false, amount, rate, int64(day))
-			if err != nil {
-				logger.LOG.Errorf("UserId [%d] Submit Offer Error: [%v]", t.TelegramId, err)
-				break
+		switch msg.(type) {
+		case *wallet.Update:
+			walletStatus := msg.(*wallet.Update)
+			if walletStatus.Type == "funding" && walletStatus.Currency == "USD" && walletStatus.BalanceAvailable >= 50 {
+				t.Wallet.Update(walletStatus.Balance, walletStatus.BalanceAvailable)
+				t.SubmitFundingOffer()
 			}
-			rate += t.Config.GetIncreaseRate()
-			amount = t.Wallet.GetAmount(fixedAmount)
+			break
+		case *ticker.Update:
+			tick := msg.(*ticker.Update)
+			notifyVolumeKey := fmt.Sprintf("%s:volume:%d", NotifyKey, t.TelegramId)
+			notifyRateKey := fmt.Sprintf("%s:rate:%d", NotifyKey, t.TelegramId)
+			if isNotify, err := redis.Get(notifyVolumeKey); err == nil && isNotify == "" && tick.Volume <= warningVolume {
+				s2c.SendMessage(t.TelegramId, fmt.Sprintf("FRR [%v] , Volume [%v]", tick.Frr, tick.Volume))
+				redis.SetNX(notifyVolumeKey, 1, 4*time.Hour)
+			}
+
+			if isNotify, err := redis.Get(notifyRateKey); err == nil && isNotify == "" && tick.LastPrice >= t.Config.GetCrazyRate() {
+				s2c.SendMessage(t.TelegramId, fmt.Sprintf("High Rate Now [%v]!!!!!", tick.LastPrice))
+				redis.SetNX(notifyRateKey, 1, 6*time.Hour)
+			}
+			break
 		}
 	}
 }
@@ -169,13 +161,12 @@ loop:
 			t.BFSocket.CalWalletUpdate()
 			if ws := t.API.Wallets(t.TelegramId); ws != nil {
 				for _, wallets := range ws.Snapshot {
-					if wallets.Type == "funding" && wallets.Currency == "USD"{
-						utils.PrintWithStruct(wallets)
+					if wallets.Type == "funding" && wallets.Currency == "USD" && wallets.BalanceAvailable >= 50 {
 						newWalletUpdate := &wallet.Update{
 							Balance:          wallets.Balance,
 							BalanceAvailable: wallets.BalanceAvailable,
 						}
-						t.UpdateWalletChan <- newWalletUpdate
+						t.MessageChan <- newWalletUpdate
 					}
 				}
 			}
@@ -197,13 +188,45 @@ loop:
 						//t.API.CancelFundingOffer(t.TelegramId, offer.ID)
 						t.BFSocket.CancelFundingOffer(offer.ID)
 						lastUnMatchTimeStamp = now.Unix()
-						go s2c.SendMessage(t.TelegramId, fmt.Sprintf("單號:%d Rate: %f Day: %d ,..超過%d分鐘未撮合, 今日已累積未搓合次數:%d", offer.ID, offer.Rate, offer.Period, cancelTime, unMatchCount))
+						s2c.SendMessage(t.TelegramId, fmt.Sprintf("單號:%d Rate: %f Day: %d ,..超過%d分鐘未撮合, 今日已累積未搓合次數:%d", offer.ID, offer.Rate, offer.Period, cancelTime, unMatchCount))
 					}
 				}
 			}
 		case <-t.ctx.Done():
 			break loop
 		}
+	}
+}
+
+func (t *UserInfo) SubmitFundingOffer() {
+	if t.Wallet.BalanceAvailable < 50 || t.Config.GetSubmitOffer() == false {
+		return
+	}
+
+	// 放貸天數
+	day := t.Config.GetDay()
+	// 計算放貸利率
+	rate := t.CalculateCenter.CalculateRateByConfig(t.Config.GetWeights())
+
+	bottomRate := t.Config.GetBottomRate()
+	if rate <= bottomRate {
+		log.Println("計算結果 %v 低於最低利率 %v: ", rate, bottomRate)
+		rate = bottomRate
+	}
+
+	fixedAmount := t.Config.GetFixedAmount()
+	amount := t.Wallet.GetAmount(fixedAmount)
+	for amount >= 50 {
+		day = t.Config.GetDayByRate(rate)
+
+		logger.LOG.Infof("Calculate Rate : %v, Period %d, Amount %v", rate, day, amount)
+		err := t.BFSocket.SubmitFundingOffer(common.FundingPrefix+"USD", amount, rate, int64(day))
+		if err != nil {
+			logger.LOG.Errorf("UserId [%d] Submit Offer Error: [%v]", t.TelegramId, err)
+			break
+		}
+		rate += t.Config.GetIncreaseRate()
+		amount = t.Wallet.GetAmount(fixedAmount)
 	}
 }
 

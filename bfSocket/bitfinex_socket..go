@@ -2,7 +2,9 @@ package bfSocket
 
 import (
 	"context"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/common"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/fundingoffer"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/ticker"
 	"log"
 	"os"
 	"robot/utils"
@@ -51,48 +53,47 @@ func (st *Socket) Close() {
 	st.Client.Close()
 }
 
-func (st *Socket) Listen(updateWalletChan chan *wallet.Update) {
+func (st *Socket) Listen(msgChan chan interface{}) {
 	go func() {
-		//wallet := policy.NewWallet()
+		_, err := st.Client.SubscribeTicker(context.Background(), common.FundingPrefix+"USD")
+		if err != nil {
+			log.Printf("SubscribeTicker error:  %v", err)
+		}
+
 		for obj := range st.Client.Listen() {
 			switch obj.(type) {
 			case error:
 				log.Printf("Socket error: %v", obj.(error))
-			//case *bitfinex.WalletUpdate:
 			case *wallet.Update:
-				walletStatus := obj.(*wallet.Update)
-				if walletStatus.Type == "funding" && walletStatus.Currency == "USD" {
-					updateWalletChan <- walletStatus
-				}
-				//if walletStatus.BalanceAvailable >= 50 && walletStatus.Type == "funding" {
-				//	//wallet.Update(walletStatus.Balance, walletStatus.BalanceAvailable)
-				//	updateWalletChan <- 1
+				msgChan <- obj
+				//walletStatus := obj.(*wallet.Update)
+				//if walletStatus.Type == "funding" && walletStatus.Currency == "USD" && walletStatus.BalanceAvailable >= 50 {
+				//	updateWalletChan <- walletStatus
 				//}
+				break
 			case *wallet.Snapshot:
 				walletSnapshot := obj.(*wallet.Snapshot)
 				for _, wallets := range walletSnapshot.Snapshot {
-					if wallets.Type == "funding" && wallets.Currency == "USD"{
-						utils.PrintWithStruct(wallets)
+					if wallets.Type == "funding" && wallets.Currency == "USD" && wallets.BalanceAvailable >= 50 {
 						newWalletUpdate := &wallet.Update{
 							Balance:          wallets.Balance,
 							BalanceAvailable: wallets.BalanceAvailable,
 						}
-						updateWalletChan <- newWalletUpdate
+						msgChan  <- newWalletUpdate
 					}
 				}
-			//case *fundingoffer.Snapshot:
-			//	fundingOffer := obj.(*fundingoffer.Snapshot)
-			//case *bitfinex.FundingOfferNew:
-			//case *bitfinex.FundingOfferUpdate:
-			//// 個人funding 交易 即時狀況
-			//case *bitfinex.FundingTrade:
-			//fundingTrade := obj.(*bitfinex.FundingTrade)
-			//content, _ := utils.JsonString(fundingTrade)
-			//lineBot.LineSendMessage(content)
+				break
+			case *ticker.Update:
+				msgChan <- obj
+				//msg := obj.(*ticker.Update)
+				break
+
 
 			default:
 				utils.PrintWithStruct(obj)
 			}
+
+
 		}
 	}()
 }
