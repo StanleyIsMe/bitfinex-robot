@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/bitfinexcom/bitfinex-api-go/pkg/convert"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/book"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/common"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/fundingoffer"
@@ -12,6 +13,7 @@ import (
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/wallet"
 	"log"
 	"os"
+	"robot/model"
 	"sync"
 	"time"
 
@@ -21,7 +23,7 @@ import (
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
 )
 
-const RateLimit int8 = 15
+const RateLimit int8 = 20
 
 type APIClient struct {
 	sync.RWMutex
@@ -39,11 +41,11 @@ var APIClientInstance *APIClient
 func NewAPIClient() *APIClient {
 	APIOnce.Do(func() {
 		url := os.Getenv("BFX_API_URI")
-		pubClient := rest.NewClientWithURL(url).Credentials(os.Getenv("API_KEY"), os.Getenv("API_SEC"))
+		//pubClient := rest.NewClientWithURL(url).Credentials(os.Getenv("API_KEY"), os.Getenv("API_SEC"))
 		APIClientInstance = &APIClient{
 			rateCount:    10,
 			ClientList:   make(map[int64]*rest.Client, 0),
-			PublicClient: pubClient,
+			PublicClient: rest.NewClientWithURL(url),
 		}
 
 		APIClientInstance.ctx, APIClientInstance.cancel = context.WithCancel(context.Background())
@@ -245,4 +247,76 @@ func (api *APIClient) Wallets(userId int64) *wallet.Snapshot {
 		return response
 	}
 	return nil
+}
+
+func (api *APIClient) GetTicker(symbol string) *model.TickerCustom {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.LOG.Errorf("GetTicker panic : %s", err)
+		}
+	}()
+
+	if api.CheckRateCount() != nil {
+		return nil
+	}
+
+	req := rest.NewRequestWithMethod("ticker/" + symbol, "GET")
+	raw, err := api.PublicClient.Request(req)
+	if err != nil {
+		fmt.Println(err)
+	}
+	t := &model.TickerCustom{}
+	for index, val := range raw {
+		switch index {
+		case 0:
+			t.Frr = convert.F64ValOrZero(val)
+			break
+		case 1:
+			t.Bid = convert.F64ValOrZero(val)
+			break
+		case 2:
+			t.BidPeriod = convert.I64ValOrZero(val)
+			break
+		case 3:
+			t.BidSize = convert.F64ValOrZero(val)
+			break
+		case 4:
+			t.Ask = convert.F64ValOrZero(val)
+			break
+		case 5:
+			t.AskPeriod = convert.I64ValOrZero(val)
+			break
+		case 6:
+			t.AskSize = convert.F64ValOrZero(val)
+			break
+		case 7:
+			t.DailyChange = convert.F64ValOrZero(val)
+			break
+		case 8:
+			t.DailyChangePerc = convert.F64ValOrZero(val)
+			break
+		case 9:
+			t.LastPrice = convert.F64ValOrZero(val)
+			break
+		case 10:
+			t.Volume = convert.F64ValOrZero(val)
+			break
+		case 11:
+			t.High = convert.F64ValOrZero(val)
+			break
+		case 12:
+			t.Low = convert.F64ValOrZero(val)
+			break
+		case 15:
+			t.FrrAmountAvailable = convert.F64ValOrZero(val)
+			break
+		}
+	}
+
+	if err != nil {
+		logger.LOG.Errorf("GetTicker err : %s", err)
+		return nil
+	}
+
+	return t
 }

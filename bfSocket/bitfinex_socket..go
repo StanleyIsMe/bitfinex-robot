@@ -2,9 +2,7 @@ package bfSocket
 
 import (
 	"context"
-	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/common"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/fundingoffer"
-	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/ticker"
 	"log"
 	"os"
 	"robot/utils"
@@ -55,10 +53,10 @@ func (st *Socket) Close() {
 
 func (st *Socket) Listen(msgChan chan interface{}) {
 	go func() {
-		_, err := st.Client.SubscribeTicker(context.Background(), common.FundingPrefix+"USD")
-		if err != nil {
-			log.Printf("SubscribeTicker error:  %v", err)
-		}
+		//_, err := st.Client.SubscribeTicker(context.Background(), common.FundingPrefix+"USD")
+		//if err != nil {
+		//	log.Printf("SubscribeTicker error:  %v", err)
+		//}
 
 		for obj := range st.Client.Listen() {
 			switch obj.(type) {
@@ -83,10 +81,10 @@ func (st *Socket) Listen(msgChan chan interface{}) {
 					}
 				}
 				break
-			case *ticker.Update:
-				msgChan <- obj
-				//msg := obj.(*ticker.Update)
-				break
+			//case *ticker.Update:
+			//	msgChan <- obj
+			//	//msg := obj.(*ticker.Update)
+			//	break
 
 
 			default:

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/common"
-	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/ticker"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/wallet"
 	"log"
 	"robot/bfApi"
@@ -94,7 +93,6 @@ func (t *UserInfo) StartActive() {
 // 監聽 wallet 狀況
 func (t *UserInfo) ListenWalletStatus() {
 	t.BFSocket.Listen(t.MessageChan)
-	warningVolume := 20000000.0
 
 	for msg := range t.MessageChan {
 
@@ -106,20 +104,20 @@ func (t *UserInfo) ListenWalletStatus() {
 				t.SubmitFundingOffer()
 			}
 			break
-		case *ticker.Update:
-			tick := msg.(*ticker.Update)
-			notifyVolumeKey := fmt.Sprintf("%s:volume:%d", NotifyKey, t.TelegramId)
-			notifyRateKey := fmt.Sprintf("%s:rate:%d", NotifyKey, t.TelegramId)
-			if isNotify, err := redis.Get(notifyVolumeKey); err == nil && isNotify == "" && tick.Volume <= warningVolume {
-				s2c.SendMessage(t.TelegramId, fmt.Sprintf("FRR [%v] , Volume [%v]", tick.Frr, tick.Volume))
-				redis.SetNX(notifyVolumeKey, 1, 4*time.Hour)
-			}
-
-			if isNotify, err := redis.Get(notifyRateKey); err == nil && isNotify == "" && tick.LastPrice >= t.Config.GetCrazyRate() {
-				s2c.SendMessage(t.TelegramId, fmt.Sprintf("High Rate Now [%v]!!!!!", tick.LastPrice))
-				redis.SetNX(notifyRateKey, 1, 6*time.Hour)
-			}
-			break
+		//case *ticker.Update:
+		//	tick := msg.(*ticker.Update)
+		//	notifyVolumeKey := fmt.Sprintf("%s:volume:%d", NotifyKey, t.TelegramId)
+		//	notifyRateKey := fmt.Sprintf("%s:rate:%d", NotifyKey, t.TelegramId)
+		//	if isNotify, err := redis.Get(notifyVolumeKey); err == nil && isNotify == "" && tick.Volume <= warningVolume {
+		//		s2c.SendMessage(t.TelegramId, fmt.Sprintf("FRR [%v] , Volume [%v]", tick.Frr, tick.Volume))
+		//		redis.SetNX(notifyVolumeKey, 1, 4*time.Hour)
+		//	}
+		//
+		//	if isNotify, err := redis.Get(notifyRateKey); err == nil && isNotify == "" && tick.LastPrice >= t.Config.GetCrazyRate() {
+		//		s2c.SendMessage(t.TelegramId, fmt.Sprintf("High Rate Now [%v]!!!!!", tick.LastPrice))
+		//		redis.SetNX(notifyRateKey, 1, 6*time.Hour)
+		//	}
+		//	break
 		}
 	}
 }
@@ -192,6 +190,9 @@ loop:
 					}
 				}
 			}
+
+			//todo 高利率警告暫時寫這
+			t.MonitorHighRate()
 		case <-t.ctx.Done():
 			break loop
 		}
@@ -269,4 +270,24 @@ func (t *UserInfo) GetInterest() *model.DailyInterestReport {
 	}
 
 	return report
+}
+
+func (t *UserInfo) MonitorHighRate() {
+	tick := t.API.GetTicker(common.FundingPrefix + "USD")
+	if tick == nil {
+		return
+	}
+	warningVolume := 30000000.0
+
+	notifyVolumeKey := fmt.Sprintf("%s:volume:%d", NotifyKey, t.TelegramId)
+	notifyRateKey := fmt.Sprintf("%s:rate:%d", NotifyKey, t.TelegramId)
+	if isNotify, err := redis.Get(notifyVolumeKey); err == nil && isNotify == "" && tick.FrrAmountAvailable <= warningVolume {
+		s2c.SendMessage(t.TelegramId, fmt.Sprintf("FRR [%v] , Volume [%v]", tick.Frr, tick.Volume))
+		redis.SetNX(notifyVolumeKey, 1, 4*time.Hour)
+	}
+
+	if isNotify, err := redis.Get(notifyRateKey); err == nil && isNotify == "" && tick.LastPrice >= t.Config.GetCrazyRate() {
+		s2c.SendMessage(t.TelegramId, fmt.Sprintf("High Rate Now [%v]!!!!!", tick.LastPrice))
+		redis.SetNX(notifyRateKey, 1, 6*time.Hour)
+	}
 }

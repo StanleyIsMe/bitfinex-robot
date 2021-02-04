@@ -30,6 +30,7 @@ func SendMessage(chatId int64, text string) {
 	}
 
 	msg := tgbotapi.NewMessage(chatId, text)
+
 	if _, err := telegramInstance.Send(msg); err != nil {
 		log.Printf("Send Message Error : %v", err)
 	}
