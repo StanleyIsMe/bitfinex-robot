@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"os"
 	"robot/logger"
+	"robot/model"
 	"robot/utils/s2c"
 	"strconv"
 	"sync"
@@ -46,15 +46,13 @@ func GetInstance() *Pool {
 	return UserPool
 }
 
-func (pool *Pool) RegisterUser(telegramId int64, key, sec string) error {
+func (pool *Pool) RegisterUser(registerInput model.RegisterRequest) error {
 	pool.Lock()
 	defer func() {
 		pool.Unlock()
 		if r := recover(); r != nil {
 			logger.LOG.WithFields(logrus.Fields{
-				"userId": telegramId,
-				"key":    key,
-				"sec":    sec,
+				"req": registerInput,
 			}).Error(r)
 		}
 	}()
@@ -63,11 +61,11 @@ func (pool *Pool) RegisterUser(telegramId int64, key, sec string) error {
 		return errors.New("註冊人數已滿")
 	}
 
-	if _, ok := pool.UserList[telegramId]; ok {
+	if _, ok := pool.UserList[registerInput.UserId]; ok {
 		return errors.New("已註冊過")
 	}
 
-	telegramIdStr := strconv.Itoa(int(telegramId))
+	telegramIdStr := strconv.Itoa(int(registerInput.UserId))
 	result, err := redis.HGET(UserKey, telegramIdStr)
 	if err != nil {
 		return err
@@ -77,13 +75,13 @@ func (pool *Pool) RegisterUser(telegramId int64, key, sec string) error {
 		return errors.New("已註冊過")
 	}
 
-	newuser := NewUser(telegramId, key, sec)
+	newuser := NewUser(registerInput.UserId, registerInput.Token, registerInput.Sec, registerInput.Name)
 	//utils.PrintWithStruct(newuser.API.Wallets(telegramId), "!!!!!!!!")
 	if err := redis.HSET(UserKey, telegramIdStr, newuser); err != nil {
 		return err
 	}
 
-	pool.UserList[telegramId] = newuser
+	pool.UserList[registerInput.UserId] = newuser
 	return nil
 }
 
@@ -117,10 +115,10 @@ func (pool *Pool) GetUserById(telegramId int64) *UserInfo {
 	return nil
 }
 
-func (pool *Pool) SetManageUser() {
-	userId, _ := strconv.ParseInt(os.Getenv("TELEGRAM_MANAGE_ID"), 10, 64)
-	pool.RegisterUser(userId, os.Getenv("API_KEY"), os.Getenv("API_SEC"))
-}
+//func (pool *Pool) SetManageUser() {
+//	userId, _ := strconv.ParseInt(os.Getenv("TELEGRAM_MANAGE_ID"), 10, 64)
+//	pool.RegisterUser(userId, os.Getenv("API_KEY"), os.Getenv("API_SEC"))
+//}
 
 func (pool *Pool) UpdateById(telegramId int64) error {
 	telegramIdStr := strconv.Itoa(int(telegramId))
@@ -132,6 +130,19 @@ func (pool *Pool) UpdateById(telegramId int64) error {
 	if err := redis.HSET(UserKey, telegramIdStr, user); err != nil {
 		logger.LOG.Errorf("UpdateById Error %v", err)
 		return err
+	}
+	return nil
+}
+
+func (pool *Pool) KillUser(telegramId int64) error {
+	telegramIdStr := strconv.Itoa(int(telegramId))
+	if err := redis.HDel(UserKey, telegramIdStr); err != nil {
+		logger.LOG.Errorf("KillUser Error %v", err)
+		return err
+	}
+	if member := pool.GetUserById(telegramId); member != nil {
+		member.StopActive()
+		delete(pool.UserList, telegramId)
 	}
 	return nil
 }

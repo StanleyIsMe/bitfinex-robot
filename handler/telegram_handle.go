@@ -3,13 +3,15 @@ package handler
 import (
 	"fmt"
 	"github.com/sirupsen/logrus"
+	"os"
 	"robot/logger"
+	"robot/model"
 	"robot/user"
 	"robot/utils"
 	"strconv"
 )
 
-func RegisterHandle(telegramId int64, token, secret string) (response string) {
+func RegisterHandle(request model.RegisterRequest) (response string) {
 	defer func() {
 		if err := recover(); err != nil {
 			logger.LOG.Errorf("RegisterHandle Panic : %v", err)
@@ -18,9 +20,9 @@ func RegisterHandle(telegramId int64, token, secret string) (response string) {
 	}()
 
 	userPool := user.GetInstance()
-	err := userPool.RegisterUser(telegramId, token, secret)
+	err := userPool.RegisterUser(request)
 	if err != nil {
-		errMessage := fmt.Sprintf("TelegramId [%d], Token [%s], Sec [%s] 註冊失敗: %v", telegramId, token, secret, err)
+		errMessage := fmt.Sprintf("TelegramId [%d], Token [%s], Sec [%s] 註冊失敗: %v", request.UserId, request.Token, request.Sec, err)
 		logger.LOG.Errorf(errMessage)
 		return errMessage
 	}
@@ -102,6 +104,13 @@ func UpdateConfigHandle(telegramId int64, key, value string) (reply string) {
 		}
 
 		config.SetAutoCancelTime(cancelTime)
+	case "notify_rate":
+		rate, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			panic(err)
+		}
+		config.SetNotifyRate(rate)
+		break
 	default:
 		return "找不到對應動作"
 	}
@@ -144,6 +153,84 @@ func GetInterest(telegramId int64) string {
 	return content
 }
 
+func Quit(telegramId int64) string {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.LOG.Errorf("Quit Panic : %v", err)
+		}
+	}()
+
+	userController := user.GetInstance()
+	user := userController.GetUserById(telegramId)
+	if user == nil {
+		return "用戶未註冊"
+	}
+	if err := userController.KillUser(telegramId); err != nil {
+		logger.LOG.Errorf("User %d Quit Error : %v", telegramId, err)
+		return "退出失敗"
+	}
+	return "退出成功"
+}
+
+func Kill(telegramId int64, arg string) string {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.LOG.Errorf("Kill Panic : %v", err)
+		}
+	}()
+
+	killUserId, err := strconv.ParseInt(arg, 10, 64)
+	if err != nil {
+		return "參數錯誤"
+	}
+
+	manageUserId, _ := strconv.ParseInt(os.Getenv("TELEGRAM_MANAGE_ID"), 10, 64)
+	if telegramId != manageUserId {
+		return "非管理者無法踢除"
+	}
+
+	if telegramId == killUserId {
+		return "無法踢除自己"
+	}
+
+	userController := user.GetInstance()
+	if err := userController.KillUser(killUserId); err != nil {
+		logger.LOG.Errorf("User %d Kill Error : %v", killUserId, err)
+		return "踢除失敗"
+	}
+	return "踢除成功"
+}
+
+func Start(telegramId int64) string {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.LOG.Errorf("GetInterest Panic : %v", err)
+		}
+	}()
+
+	user := user.GetInstance().GetUserById(telegramId)
+	if user == nil {
+		return "用戶未註冊"
+	}
+	user.StartActive()
+	return "成功"
+}
+
+func Stop(telegramId int64) string {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.LOG.Errorf("GetInterest Panic : %v", err)
+		}
+	}()
+
+	user := user.GetInstance().GetUserById(telegramId)
+	if user == nil {
+		return "用戶未註冊"
+	}
+	user.StopActive()
+	return "成功"
+}
+
 func Wallets(telegramId int64) string {
 	defer func() {
 		if err := recover(); err != nil {
@@ -156,5 +243,5 @@ func Wallets(telegramId int64) string {
 		return "用戶未註冊"
 	}
 	utils.PrintWithStruct(user.API.Wallets(user.TelegramId))
-	return  "成功"
+	return "成功"
 }

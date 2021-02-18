@@ -15,13 +15,14 @@ import (
 	"robot/utils/redis"
 	"robot/utils/s2c"
 	"runtime/debug"
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type UserInfo struct {
 	TelegramId  int64            `json:"telegram_id"`
 	Config      *ConfigManage    `json:"config"`
+	Name        string           `json:"name"`
 	Key         string           `json:"key"` // bitfinex api key
 	Sec         string           `json:"sec"` // bitfinex sec
 	Wallet      *Wallet          `json:"-"`
@@ -30,18 +31,11 @@ type UserInfo struct {
 	NotifyChan  chan int         `json:"-"`
 	MessageChan chan interface{} `json:"-"`
 
+	Idle            int32                    `json:"-"`
 	CalculateCenter *policy.CalculateCenter `json:"-"`
 	ctx             context.Context         `json:"-"`
 	cancel          context.CancelFunc      `json:"-"`
 }
-
-//func (t *UserInfo) MarshalBinary() ([]byte, error) {
-//	return msgpack.Marshal(t)
-//}
-//
-//func (t *UserInfo) BinaryUnmarshaler(data []byte) error {
-//	return msgpack.Unmarshal(data, t)
-//}
 
 func (t *UserInfo) MarshalBinary() ([]byte, error) {
 	return json.Marshal(t)
@@ -54,29 +48,35 @@ func (t *UserInfo) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-func NewUser(telegramId int64, key, sec string) *UserInfo {
+func NewUser(telegramId int64, key, sec, name string) *UserInfo {
 	instance := &UserInfo{
-		TelegramId:      telegramId,
-		Config:          NewConfig(),
-		Key:             key,
-		Sec:             sec,
-		Wallet:          NewWallet(),
-		API:             bfApi.NewAPIClient(),
-		BFSocket:        bfSocket.NewSocket(key, sec),
-		NotifyChan:      make(chan int),
-		MessageChan:     make(chan interface{}),
-		CalculateCenter: policy.NewCalculateCenter(),
+		TelegramId: telegramId,
+		Config:     NewConfig(),
+		Key:        key,
+		Sec:        sec,
+		Name:       name,
+		Idle: 1,
+		//Wallet:          NewWallet(),
+		//API:             bfApi.NewAPIClient(),
+		//NotifyChan:      make(chan int),
+		//MessageChan:     make(chan interface{}),
+		//CalculateCenter: policy.NewCalculateCenter(),
 	}
 
-	instance.API.RegisterClient(telegramId, key, sec)
-	instance.ctx, instance.cancel = context.WithCancel(context.Background())
-	go instance.ListenWalletStatus()
-	go instance.ListenOnFundingOffer()
+	//instance.API.RegisterClient(telegramId, key, sec)
+	//instance.ctx, instance.cancel = context.WithCancel(context.Background())
+	//instance.BFSocket = bfSocket.NewSocket(instance.ctx, key, sec)
+	//go instance.ListenWalletStatus()
+	//go instance.ListenOnFundingOffer()
 
 	return instance
 }
 
 func (t *UserInfo) StartActive() {
+	if atomic.LoadInt32(&(t.Idle)) == 0 {
+		return
+	}
+
 	t.Wallet = NewWallet()
 	t.API = bfApi.NewAPIClient()
 	t.BFSocket = bfSocket.NewSocket(t.Key, t.Sec)
@@ -86,8 +86,19 @@ func (t *UserInfo) StartActive() {
 	t.Config.WeightsInit()
 	t.API.RegisterClient(t.TelegramId, t.Key, t.Sec)
 	t.ctx, t.cancel = context.WithCancel(context.Background())
+	atomic.StoreInt32(&(t.Idle), 0)
 	go t.ListenWalletStatus()
 	go t.ListenOnFundingOffer()
+}
+
+func (t *UserInfo) StopActive() {
+	if atomic.LoadInt32(&(t.Idle)) == 1 {
+		return
+	}
+	atomic.StoreInt32(&(t.Idle), 1)
+	t.cancel()
+	t.BFSocket.Close()
+	close(t.MessageChan)
 }
 
 // 監聽 wallet 狀況
@@ -104,29 +115,27 @@ func (t *UserInfo) ListenWalletStatus() {
 				t.SubmitFundingOffer()
 			}
 			break
-		//case *ticker.Update:
-		//	tick := msg.(*ticker.Update)
-		//	notifyVolumeKey := fmt.Sprintf("%s:volume:%d", NotifyKey, t.TelegramId)
-		//	notifyRateKey := fmt.Sprintf("%s:rate:%d", NotifyKey, t.TelegramId)
-		//	if isNotify, err := redis.Get(notifyVolumeKey); err == nil && isNotify == "" && tick.Volume <= warningVolume {
-		//		s2c.SendMessage(t.TelegramId, fmt.Sprintf("FRR [%v] , Volume [%v]", tick.Frr, tick.Volume))
-		//		redis.SetNX(notifyVolumeKey, 1, 4*time.Hour)
-		//	}
-		//
-		//	if isNotify, err := redis.Get(notifyRateKey); err == nil && isNotify == "" && tick.LastPrice >= t.Config.GetCrazyRate() {
-		//		s2c.SendMessage(t.TelegramId, fmt.Sprintf("High Rate Now [%v]!!!!!", tick.LastPrice))
-		//		redis.SetNX(notifyRateKey, 1, 6*time.Hour)
-		//	}
-		//	break
+			//case *ticker.Update:
+			//	tick := msg.(*ticker.Update)
+			//	notifyVolumeKey := fmt.Sprintf("%s:volume:%d", NotifyKey, t.TelegramId)
+			//	notifyRateKey := fmt.Sprintf("%s:rate:%d", NotifyKey, t.TelegramId)
+			//	if isNotify, err := redis.Get(notifyVolumeKey); err == nil && isNotify == "" && tick.Volume <= warningVolume {
+			//		s2c.SendMessage(t.TelegramId, fmt.Sprintf("FRR [%v] , Volume [%v]", tick.Frr, tick.Volume))
+			//		redis.SetNX(notifyVolumeKey, 1, 4*time.Hour)
+			//	}
+			//
+			//	if isNotify, err := redis.Get(notifyRateKey); err == nil && isNotify == "" && tick.LastPrice >= t.Config.GetCrazyRate() {
+			//		s2c.SendMessage(t.TelegramId, fmt.Sprintf("High Rate Now [%v]!!!!!", tick.LastPrice))
+			//		redis.SetNX(notifyRateKey, 1, 6*time.Hour)
+			//	}
+			//	break
 		}
 	}
 }
 
 // 監聽 訂單(未matched)狀況
 func (t *UserInfo) ListenOnFundingOffer() {
-	wg := sync.WaitGroup{}
 	defer func() {
-		wg.Done()
 		if err := recover(); nil != err {
 			bugStack := debug.Stack()
 			logger.LOG.Errorf("%v", bugStack)
@@ -136,8 +145,7 @@ func (t *UserInfo) ListenOnFundingOffer() {
 
 	unMatchCount := 0
 	var lastUnMatchTimeStamp int64
-	wg.Add(1)
-loop:
+
 	for {
 		select {
 		case <-time.After(1 * time.Minute):
@@ -194,13 +202,14 @@ loop:
 			//todo 高利率警告暫時寫這
 			t.MonitorHighRate()
 		case <-t.ctx.Done():
-			break loop
+			log.Println("用戶收到停止指令")
+			return
 		}
 	}
 }
 
 func (t *UserInfo) SubmitFundingOffer() {
-	if t.Wallet.BalanceAvailable < 50 || t.Config.GetSubmitOffer() == false {
+	if t.Wallet.BalanceAvailable < 50 {
 		return
 	}
 
@@ -282,7 +291,7 @@ func (t *UserInfo) MonitorHighRate() {
 	notifyVolumeKey := fmt.Sprintf("%s:volume:%d", NotifyKey, t.TelegramId)
 	notifyRateKey := fmt.Sprintf("%s:rate:%d", NotifyKey, t.TelegramId)
 	if isNotify, err := redis.Get(notifyVolumeKey); err == nil && isNotify == "" && tick.FrrAmountAvailable <= warningVolume {
-		s2c.SendMessage(t.TelegramId, fmt.Sprintf("FRR [%v] , Volume [%v]", tick.Frr, tick.Volume))
+		s2c.SendMessage(t.TelegramId, fmt.Sprintf("FRR [%v] , Volume [%v]", tick.Frr, tick.FrrAmountAvailable))
 		redis.SetNX(notifyVolumeKey, 1, 4*time.Hour)
 	}
 

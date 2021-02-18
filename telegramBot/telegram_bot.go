@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"robot/handler"
+	"robot/model"
 	"strconv"
 	"strings"
 )
@@ -28,7 +29,7 @@ var numericKeyboard = tgbotapi.NewReplyKeyboard(
 var inlineKeyboard = tgbotapi.NewInlineKeyboardMarkup(
 	tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData("/help", HelpCommand()),
-		),
+	),
 	//tgbotapi.NewKeyboardButtonRow(
 	//	tgbotapi.NewKeyboardButton("利息"),
 	//	//tgbotapi.NewKeyboardButton("放貸金額"),
@@ -85,7 +86,12 @@ func Listen() {
 					msg.Text = "請輸入正確格式: /register [token]:[password]"
 					break
 				}
-				msg.Text = handler.RegisterHandle(update.Message.Chat.ID, args[0], args[1])
+				msg.Text = handler.RegisterHandle(model.RegisterRequest{
+					UserId: update.Message.Chat.ID,
+					Name:   update.Message.Chat.FirstName,
+					Token:  args[0],
+					Sec:    args[1],
+				})
 				break
 			case "rate":
 				msg.Text = handler.CalculateRateHandle(update.Message.Chat.ID)
@@ -105,18 +111,32 @@ func Listen() {
 			case "interest":
 				msg.Text = handler.GetInterest(update.Message.Chat.ID)
 				break
+			case "quit":
+				msg.Text = handler.Quit(update.Message.Chat.ID)
+				break
+			case "kill":
+				msg.Text = handler.Kill(update.Message.Chat.ID, update.Message.CommandArguments())
+				break
+			case "start":
+				msg.Text = handler.Start(update.Message.Chat.ID)
+				break
+			case "stop":
+				msg.Text = handler.Stop(update.Message.Chat.ID)
+				break
 			case "help":
 				msg.Text = ` /register \[token]:\[password]  //註冊放貸機器人
 /set \[key]:\[value] //更新機器人設定 
+/start //機器人開始運作
+/stop //機器人停止運作
 /config //查看機器人設定 
 /interest //查看利息所得 
 `
 				msg.ParseMode = tgbotapi.ModeMarkdown
 				break
 
-			//case "wallets":
-			//	msg.Text = handler.Wallets(update.Message.Chat.ID)
-			//	break
+				//case "wallets":
+				//	msg.Text = handler.Wallets(update.Message.Chat.ID)
+				//	break
 			}
 
 			//switch update.Message.Text {
@@ -154,8 +174,6 @@ func Listen() {
 	}()
 }
 
-
-
 func ServerMessage(text string) {
 	if bot == nil {
 		BotInit()
@@ -187,4 +205,3 @@ func parseText(input string) []string {
 	//	return "", ""
 	//}
 }
-

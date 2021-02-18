@@ -5,6 +5,7 @@ import (
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/fundingoffer"
 	"log"
 	"os"
+	"robot/logger"
 	"robot/utils"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 
 type Socket struct {
 	Client *websocket.Client
+	ctx     context.Context         `json:"-"`
 }
 
 func NewSocket(key, secret string) *Socket {
@@ -61,7 +63,8 @@ func (st *Socket) Listen(msgChan chan interface{}) {
 		for obj := range st.Client.Listen() {
 			switch obj.(type) {
 			case error:
-				log.Printf("Socket error: %v", obj.(error))
+				logger.LOG.Errorf("Socket error: %v", obj.(error))
+				return
 			case *wallet.Update:
 				msgChan <- obj
 				//walletStatus := obj.(*wallet.Update)
@@ -90,6 +93,7 @@ func (st *Socket) Listen(msgChan chan interface{}) {
 			default:
 				utils.PrintWithStruct(obj)
 			}
+
 
 
 		}

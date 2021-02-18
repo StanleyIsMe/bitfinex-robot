@@ -68,6 +68,15 @@ func HGET(key, field string) (string, error) {
 	return result, nil
 }
 
+func HDel(key, field string) error {
+	err := redisClient.conn.HDel(key, field).Err()
+	if err != nil {
+		redisClient.log.Errorf("Redis HDel Error : %v", err)
+		return err
+	}
+	return nil
+}
+
 func HGetAll(key string) (map[string]string, error) {
 	result, err := redisClient.conn.HGetAll(key).Result()
 

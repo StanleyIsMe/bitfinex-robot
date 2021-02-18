@@ -239,12 +239,28 @@ func (api *APIClient) Wallets(userId int64) *wallet.Snapshot {
 	}
 
 	if client := api.GetClientByUserId(userId); client != nil {
-		response, err := client.Wallet.Wallet()
 
+		req, err := client.NewAuthenticatedRequest(common.PermissionRead, "wallets")
 		if err != nil {
-			logger.LOG.Errorf("Wallets error : %v", err)
+			return nil
 		}
-		return response
+		raw, err := client.Request(req)
+		if err != nil {
+			return  nil
+		}
+
+		os, err := wallet.SnapshotFromRaw(raw, wallet.FromWsRaw)
+		if err != nil {
+			return  nil
+		}
+
+		return os
+		//response, err := client.Wallet.Wallet()
+		//
+		//if err != nil {
+		//	logger.LOG.Errorf("Wallets error : %v", err)
+		//}
+		//return response
 	}
 	return nil
 }
