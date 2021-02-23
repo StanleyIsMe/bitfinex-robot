@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"os"
+	"robot/common"
 	"robot/logger"
 	"robot/model"
+	"robot/policy"
 	"robot/user"
 	"robot/utils"
 	"strconv"
@@ -36,12 +38,21 @@ func CalculateRateHandle(telegramId int64) string {
 		}
 	}()
 
-	user := user.GetInstance().GetUserById(telegramId)
-	if user == nil {
-		return "用戶未註冊"
+	po := policy.NewCalculateCenter()
+	var result = map[common.StrategyType]float64{
+		common.LowFloatLowRate: po.CalculateRateByStrategy(common.LowFloatLowRate),
+		common.ExpectHighRate: po.CalculateRateByStrategy(common.ExpectHighRate),
+		common.HighFloatHighRate: po.CalculateRateByStrategy(common.HighFloatHighRate),
 	}
-	rate := user.GetFundingRate()
-	return strconv.FormatFloat(rate, 'f', 10, 64)
+	//result[common.LowFloatLowRate] = po.CalculateRateByStrategy(common.LowFloatLowRate)
+	//user := user.GetInstance().GetUserById(telegramId)
+	//if user == nil {
+	//	return "用戶未註冊"
+	//}
+	//rate := user.GetFundingRate()
+	//return fmt.Sprintf("試算結果 : %v", user.Config.GetStrategy(), strconv.FormatFloat(rate, 'f', 10, 64))
+	strResult,_  := utils.JsonString(result)
+	return fmt.Sprintf("試算結果 : %v", strResult)
 }
 
 func UpdateConfigHandle(telegramId int64, key, value string) (reply string) {
@@ -110,6 +121,13 @@ func UpdateConfigHandle(telegramId int64, key, value string) (reply string) {
 			panic(err)
 		}
 		config.SetNotifyRate(rate)
+		break
+	case "strategy":
+		strategy, err := strconv.Atoi(value)
+		if err != nil {
+			panic(err)
+		}
+		config.SetStrategy(common.StrategyType(strategy))
 		break
 	default:
 		return "找不到對應動作"
@@ -208,11 +226,15 @@ func Start(telegramId int64) string {
 		}
 	}()
 
-	user := user.GetInstance().GetUserById(telegramId)
+	userPool := user.GetInstance()
+	user := userPool.GetUserById(telegramId)
 	if user == nil {
 		return "用戶未註冊"
 	}
 	user.StartActive()
+	if err := userPool.UpdateById(telegramId); err != nil {
+		return "操作失敗"
+	}
 	return "成功"
 }
 
@@ -223,11 +245,15 @@ func Stop(telegramId int64) string {
 		}
 	}()
 
-	user := user.GetInstance().GetUserById(telegramId)
+	userPool := user.GetInstance()
+	user := userPool.GetUserById(telegramId)
 	if user == nil {
 		return "用戶未註冊"
 	}
 	user.StopActive()
+	if err := userPool.UpdateById(telegramId); err != nil {
+		return "操作失敗"
+	}
 	return "成功"
 }
 

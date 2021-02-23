@@ -100,7 +100,12 @@ func (pool *Pool) InitAllUser() {
 			logger.LOG.Errorf("InitAllUser Error %v", err)
 			continue
 		}
-		user.StartActive()
+
+		if user.Idle == 0 {
+			user.Idle = 1
+			user.StartActive()
+		}
+
 		pool.UserList[user.TelegramId] = user
 	}
 }

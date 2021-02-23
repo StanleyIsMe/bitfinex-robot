@@ -3,6 +3,7 @@ package user
 import (
 	"github.com/fatih/structs"
 	"os"
+	"robot/common"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,20 +12,21 @@ import (
 type ConfigManage struct {
 	sync.RWMutex `json:"-"`
 
-	BottomRate     float64         `json:"bottom_rate"`   //最低利率"
-	FixedAmount    float64         `json:"fixed_amount"`  //`json:"固定放貸額"`
-	Day            int             `json:"day"`           //"天數"`
-	CrazyRate      float64         `json:"crazy_rate"`    //瘋狂利率"`
-	IncreaseRate   float64         `json:"increase_rate"` //遞增利率"`
-	TelegramId     int64           `json:"telegram_id"`
-	SubmitOffer    bool            `json:"submit_offer"` //自動放貸"`
-	InvalidRate    float64         `json:"invalid_rate"` //無效利率"`
-	CrazyDayRange  map[int]float64 `json:"crazy_day_range"`
-	Weights        map[string]int  `json:"weights"` //利率計算權重"`
-	NotifyRate     float64         `json:"notify_rate"`
-	AutoCancelTime int64           `json:"auto_cancel_time"`
-	OfficialMaxDay int             `json:"official_max_day"`
-	OfficialMinDay int             `json:"official_min_day"`
+	BottomRate     float64             `json:"bottom_rate"`   //最低利率"
+	FixedAmount    float64             `json:"fixed_amount"`  //`json:"固定放貸額"`
+	Day            int                 `json:"day"`           //"天數"`
+	CrazyRate      float64             `json:"crazy_rate"`    //瘋狂利率"`
+	IncreaseRate   float64             `json:"increase_rate"` //遞增利率"`
+	TelegramId     int64               `json:"telegram_id"`
+	SubmitOffer    bool                `json:"submit_offer"` //自動放貸"`
+	InvalidRate    float64             `json:"invalid_rate"` //無效利率"`
+	CrazyDayRange  map[int]float64     `json:"crazy_day_range"`
+	Weights        map[string]int      `json:"weights"` //利率計算權重"`
+	NotifyRate     float64             `json:"notify_rate"`
+	AutoCancelTime int64               `json:"auto_cancel_time"`
+	OfficialMaxDay int                 `json:"official_max_day"`
+	OfficialMinDay int                 `json:"official_min_day"`
+	Strategy       common.StrategyType `json:"strategy"`
 }
 
 //var Config *ConfigManage
@@ -67,9 +69,6 @@ func NewConfig() *ConfigManage {
 		InvalidRate:   invalidRate,
 		CrazyDayRange: crazyDayRange,
 		Weights: map[string]int{
-			"book01":   1,
-			"book02":   1,
-			"book03":   10,
 			"avg100":   1,
 			"avg10000": 3,
 		},
@@ -78,6 +77,7 @@ func NewConfig() *ConfigManage {
 		OfficialMinDay: minDay,
 		AutoCancelTime: reLendTime,
 		NotifyRate:     0.001,
+		Strategy:       common.LowFloatLowRate,
 	}
 }
 
@@ -162,6 +162,12 @@ func (config *ConfigManage) GetNotifyRate() float64 {
 	config.Lock()
 	defer config.Unlock()
 	return config.NotifyRate
+}
+
+func (config *ConfigManage) GetStrategy() common.StrategyType {
+	config.Lock()
+	defer config.Unlock()
+	return config.Strategy
 }
 
 func (config *ConfigManage) SetBottomRate(rate float64) {
@@ -255,14 +261,17 @@ func (config *ConfigManage) SetNotifyRate(notifyRate float64) {
 	config.NotifyRate = notifyRate
 }
 
+func (config *ConfigManage) SetStrategy(strategy common.StrategyType) {
+	config.Lock()
+	defer config.Unlock()
+	config.Strategy = strategy
+}
+
 // 權重初始化
 func (config *ConfigManage) WeightsInit() {
 	config.Lock()
 	defer config.Unlock()
 	config.Weights = map[string]int{
-		"book01":   1,
-		"book02":   1,
-		"book03":   10,
 		"avg100":   1,
 		"avg10000": 3,
 	}

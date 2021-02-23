@@ -31,7 +31,7 @@ type UserInfo struct {
 	NotifyChan  chan int         `json:"-"`
 	MessageChan chan interface{} `json:"-"`
 
-	Idle            int32                    `json:"-"`
+	Idle            int32                   `json:"idle"`
 	CalculateCenter *policy.CalculateCenter `json:"-"`
 	ctx             context.Context         `json:"-"`
 	cancel          context.CancelFunc      `json:"-"`
@@ -55,7 +55,7 @@ func NewUser(telegramId int64, key, sec, name string) *UserInfo {
 		Key:        key,
 		Sec:        sec,
 		Name:       name,
-		Idle: 1,
+		Idle:       1,
 		//Wallet:          NewWallet(),
 		//API:             bfApi.NewAPIClient(),
 		//NotifyChan:      make(chan int),
@@ -183,13 +183,6 @@ func (t *UserInfo) ListenOnFundingOffer() {
 				for _, offer := range onOfferList {
 					if lastFifteenMinute > (offer.MTSCreated / 1000) {
 						unMatchCount++
-
-						//if object.UnMatchedCount%3 == 0 {
-						//	config_manage.Config.SetWeights("book03", -1)
-						//	config_manage.Config.SetWeights("avg100", 1)
-						//}
-						t.Config.SetWeights("book03", -1)
-						t.Config.SetWeights("book01", 1)
 						t.Config.SetWeights("avg100", 1)
 						//t.API.CancelFundingOffer(t.TelegramId, offer.ID)
 						t.BFSocket.CancelFundingOffer(offer.ID)
@@ -216,7 +209,7 @@ func (t *UserInfo) SubmitFundingOffer() {
 	// 放貸天數
 	day := t.Config.GetDay()
 	// 計算放貸利率
-	rate := t.CalculateCenter.CalculateRateByConfig(t.Config.GetWeights())
+	rate := t.CalculateCenter.CalculateRateByStrategy(t.Config.GetStrategy())
 
 	bottomRate := t.Config.GetBottomRate()
 	if rate <= bottomRate {
@@ -241,7 +234,7 @@ func (t *UserInfo) SubmitFundingOffer() {
 }
 
 func (t *UserInfo) GetFundingRate() float64 {
-	return t.CalculateCenter.CalculateRateByConfig(t.Config.GetWeights())
+	return t.CalculateCenter.CalculateRateByStrategy(t.Config.GetStrategy())
 }
 
 func (t *UserInfo) GetInterest() *model.DailyInterestReport {
@@ -295,8 +288,8 @@ func (t *UserInfo) MonitorHighRate() {
 		redis.SetNX(notifyVolumeKey, 1, 4*time.Hour)
 	}
 
-	if isNotify, err := redis.Get(notifyRateKey); err == nil && isNotify == "" && tick.LastPrice >= t.Config.GetCrazyRate() {
+	if isNotify, err := redis.Get(notifyRateKey); err == nil && isNotify == "" && tick.LastPrice >= t.Config.GetNotifyRate() {
 		s2c.SendMessage(t.TelegramId, fmt.Sprintf("High Rate Now [%v]!!!!!", tick.LastPrice))
-		redis.SetNX(notifyRateKey, 1, 6*time.Hour)
+		redis.SetNX(notifyRateKey, 1, 1*time.Hour)
 	}
 }
