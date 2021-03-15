@@ -39,7 +39,7 @@ func CalculateRateHandle(telegramId int64) string {
 	}()
 
 	po := policy.NewCalculateCenter()
-	var result = map[common.StrategyType]float64{
+	var result = map[common.StrategyType][]float64{
 		common.LowFloatLowRate: po.CalculateRateByStrategy(common.LowFloatLowRate),
 		common.ExpectHighRate: po.CalculateRateByStrategy(common.ExpectHighRate),
 		common.HighFloatHighRate: po.CalculateRateByStrategy(common.HighFloatHighRate),

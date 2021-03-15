@@ -46,7 +46,7 @@ type MarketDate struct {
 	DailyHighRate float64 // 每日最高利率
 	FRR           float64
 	FRRVolume     float64
-	Book          map[string]map[float64]float64 //book  map[P0~P4]map[rate]Amount
+	Book          map[float64]float64 //book  map[P0~P4]map[rate]Amount
 	AvgPriceMap   map[string]float64
 }
 
@@ -58,31 +58,30 @@ func (center *CalculateCenter) GetMarketPrice() *MarketDate {
 		return center.MarketData
 	}
 
-	bidListP0, offerListP0, err0 := center.apiClient.GetBook(bfcommon.Precision0)
-	_, offerListP1, err1 := center.apiClient.GetBook(bfcommon.Precision1)
-	_, offerListP2, err2 := center.apiClient.GetBook(bfcommon.Precision2)
-	_, offerListP3, err3 := center.apiClient.GetBook(bfcommon.Precision3)
-	_, offerListP4, err4 := center.apiClient.GetBook("P4")
+	//bidListP0, offerListP0, err0 := center.apiClient.GetBook(bfcommon.Precision0)
+	//_, offerListP1, err1 := center.apiClient.GetBook(bfcommon.Precision1)
+	//_, offerListP2, err2 := center.apiClient.GetBook(bfcommon.Precision2)
+	//_, offerListP3, err3 := center.apiClient.GetBook(bfcommon.Precision3)
+	//_, offerListP4, err4 := center.apiClient.GetBook("P4")
+	offerList, err := center.apiClient.GetAllBook()
 	tick := center.apiClient.GetTicker(bfcommon.FundingPrefix + "USD")
 	matchedList, err := center.apiClient.GetMatched(10000)
-	if err != nil || err0 != nil || err1 != nil || err2 != nil || err3 != nil || err4 != nil || len(bidListP0) == 0 || tick == nil {
-		logger.LOG.Error("計算市場利率發生錯誤:", err, err0, err1, err2, err3, err4)
+	//if err != nil || err0 != nil || err1 != nil || err2 != nil || err3 != nil || err4 != nil || len(bidListP0) == 0 || tick == nil {
+	//	logger.LOG.Error("計算市場利率發生錯誤:", err, err0, err1, err2, err3, err4)
+	//	return nil
+	//}
+
+	if err != nil  || tick == nil {
+		logger.LOG.Error("計算市場利率發生錯誤:", err)
 		return nil
 	}
 
 	invalidRate, _ := strconv.ParseFloat(os.Getenv("INVALID_RATE"), 64)
 	center.MarketData = &MarketDate{
-		BidMaxRate:    bidListP0[0].Price,
 		DailyHighRate: tick.High,
 		FRR:           tick.Frr,
 		FRRVolume:     tick.FrrAmountAvailable,
-		Book: map[string]map[float64]float64{
-			"P0": center.ArrangeBookData(offerListP0),
-			"P1": center.ArrangeBookData(offerListP1),
-			"P2": center.ArrangeBookData(offerListP2),
-			"P3": center.ArrangeBookData(offerListP3),
-			"P4": center.ArrangeBookData(offerListP4),
-		},
+		Book: offerList,
 		AvgPriceMap: map[string]float64{
 			"avg100":   excueMatchedAvg(matchedList[0:100], invalidRate),
 			"avg10000": excueMatchedAvg(matchedList, invalidRate),
@@ -145,14 +144,14 @@ loop:
 //	return allAvg
 //}
 
-func (center *CalculateCenter) CalculateRateByStrategy(strategy common.StrategyType) float64 {
+func (center *CalculateCenter) CalculateRateByStrategy(strategy common.StrategyType) []float64 {
 	marketData := center.GetMarketPrice()
 
 	if marketData == nil {
-		return 0
+		return nil
 	}
 
-	var executeResult float64
+	var executeResult []float64
 	switch strategy {
 	case common.LowFloatLowRate:
 		obj := NewLowFloatLowRate()
@@ -167,13 +166,18 @@ func (center *CalculateCenter) CalculateRateByStrategy(strategy common.StrategyT
 		executeResult = obj.Execute(marketData)
 		break
 	default:
-		executeResult = 0
+		executeResult = []float64{}
 	}
 
 	// 假如算出比近期平均成交利率還低，就以平均成交利率為主
 	if matchAvg100, ok := marketData.AvgPriceMap["avg100"]; ok {
-		if executeResult < matchAvg100 {
-			return matchAvg100
+
+		if len(executeResult) == 0 {
+			return []float64{matchAvg100}
+		}
+
+		if executeResult[0] < matchAvg100 {
+			return []float64{matchAvg100}
 		}
 	}
 

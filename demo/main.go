@@ -20,6 +20,8 @@ func main() {
 	for _, val := range result.Snapshot[100:] {
 		total[val.Rate] += val.Amount
 	}
+
+
 	utils.PrintWithStruct(total)
 	var tt []float64
 	for index, _ := range total {
@@ -31,7 +33,6 @@ func main() {
 	for _, rate := range tt {
 		utils.PrintWithStruct(rate, total[rate])
 	}
-
 }
 
 // 低浮動低利率 0.0002~0.0005  (FRR 0.0005, volum 3000w up)

@@ -209,17 +209,25 @@ func (t *UserInfo) SubmitFundingOffer() {
 	// 放貸天數
 	day := t.Config.GetDay()
 	// 計算放貸利率
-	rate := t.CalculateCenter.CalculateRateByStrategy(t.Config.GetStrategy())
-
-	bottomRate := t.Config.GetBottomRate()
-	if rate <= bottomRate {
-		log.Println("計算結果 %v 低於最低利率 %v: ", rate, bottomRate)
-		rate = bottomRate
+	rateList := t.CalculateCenter.CalculateRateByStrategy(t.Config.GetStrategy())
+	if len(rateList) == 0 {
+		logger.LOG.Errorf("UserId [%d] Submit Offer Error: [計算不出利率]", t.TelegramId)
+		return
 	}
+	bottomRate := t.Config.GetBottomRate()
+
 
 	fixedAmount := t.Config.GetFixedAmount()
 	amount := t.Wallet.GetAmount(fixedAmount)
+	rateIndex := 0
 	for amount >= 50 {
+		rate := rateList[rateIndex]
+
+		if rate <= bottomRate {
+			log.Println("計算結果 %v 低於最低利率 %v: ", rate, bottomRate)
+			rate = bottomRate
+		}
+
 		day = t.Config.GetDayByRate(rate)
 
 		logger.LOG.Infof("Calculate Rate : %v, Period %d, Amount %v", rate, day, amount)
@@ -228,12 +236,16 @@ func (t *UserInfo) SubmitFundingOffer() {
 			logger.LOG.Errorf("UserId [%d] Submit Offer Error: [%v]", t.TelegramId, err)
 			break
 		}
-		rate += t.Config.GetIncreaseRate()
+		//rate += t.Config.GetIncreaseRate()
 		amount = t.Wallet.GetAmount(fixedAmount)
+		rateIndex++
+		if len(rateList) == rateIndex {
+			rateIndex = 0
+		}
 	}
 }
 
-func (t *UserInfo) GetFundingRate() float64 {
+func (t *UserInfo) GetFundingRate() []float64 {
 	return t.CalculateCenter.CalculateRateByStrategy(t.Config.GetStrategy())
 }
 

@@ -1,6 +1,10 @@
 package policy
 
-import "sort"
+import (
+	"os"
+	"sort"
+	"strconv"
+)
 
 // 低浮動低利率
 type LowFloatLowRate struct {
@@ -13,39 +17,28 @@ func (st *LowFloatLowRate) GetMarketInfo() {
 
 }
 
-func (st *LowFloatLowRate) Execute(marketData *MarketDate) float64 {
+func (st *LowFloatLowRate) Execute(marketData *MarketDate) []float64 {
 
 	var rates []float64
-	for rate, _ := range marketData.Book["P3"] {
+	for rate, _ := range marketData.Book {
 		rates = append(rates, rate)
 	}
-	sort.Sort(sort.Reverse(sort.Float64Slice(rates)))
-	var totalRate, count float64
+	sort.Sort(sort.Float64Slice(rates))
+
+	targetAmount, _ := strconv.ParseFloat(os.Getenv("POLICY_1_TARGET_AMOUNT"), 64)
+	increaseAmount, _ := strconv.ParseFloat(os.Getenv("POLICY_1_INCREASE_AMOUNT"), 64)
+
+	calAmount := 0.0
+	var rateRrr []float64
+
 	for _, rate := range rates {
-		if rate > marketData.FRR && marketData.FRRVolume > 30000000 {
-			continue
-		}
+		calAmount += marketData.Book[rate]
 
-		if count >= 5 {
-			break
+		if calAmount > targetAmount {
+			targetAmount += increaseAmount
+			rateRrr = append(rateRrr, rate)
 		}
-		totalRate += rate
-		count++
 	}
-	//for rate, amount := range marketData.Book["P3"] {
-	//	if rate > marketData.FRR && marketData.FRRVolume > 30000000 {
-	//		continue
-	//	}
-	//
-	//	//  30w~300w
-	//	if amount > 300000 && amount < 3000000 {
-	//		totalRate += rate
-	//		count++
-	//	}
-	//}
 
-	if count == 0 {
-		return marketData.FRR
-	}
-	return totalRate / count
+	return rateRrr
 }

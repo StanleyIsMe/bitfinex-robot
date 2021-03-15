@@ -12,7 +12,10 @@ import (
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/trade"
 	"github.com/bitfinexcom/bitfinex-api-go/pkg/models/wallet"
 	"log"
+	"math"
+	"net/url"
 	"os"
+	"path"
 	"robot/model"
 	"sync"
 	"time"
@@ -138,6 +141,41 @@ func (api *APIClient) GetBook(precision common.BookPrecision) (bid []*book.Book,
 	}
 
 	return book.Snapshot[0:100], book.Snapshot[100:], nil
+}
+
+func (api *APIClient) GetAllBook() (bid map[float64]float64, err error) {
+	if api.CheckRateCount() != nil {
+		return
+	}
+
+
+	req := rest.NewRequestWithMethod(path.Join("book", "fUSD", "P0"), "GET")
+	req.Params = make(url.Values)
+	req.Params.Add("_full", "1")
+	raw, err := api.PublicClient.Request(req)
+
+	if err != nil {
+		logger.LOG.Errorf("Get book list: %s", err)
+		return nil, err
+	}
+
+	result, err := book.SnapshotFromRaw("fUSD", "P0", convert.ToInterfaceArray(raw), raw)
+
+	if err != nil {
+		logger.LOG.Errorf("Get book list Paser Err: %s", err)
+		return nil, err
+	}
+
+	allBook := make(map[float64]float64, 0)
+	for _, val := range result.Snapshot {
+		if val.Amount < 0 {
+			continue
+		}
+		rate := math.Floor(val.Rate*1000000)/1000000
+		allBook[rate] += val.Amount
+	}
+
+	return allBook, nil
 }
 
 func (api *APIClient) GetMatched(limit int) ([]*trade.Trade, error) {
