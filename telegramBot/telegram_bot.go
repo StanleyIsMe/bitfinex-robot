@@ -1,16 +1,13 @@
 package telegramBot
 
 import (
+	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"log"
 	"os"
+	"robot/handler"
+	"robot/model"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/go-telegram-bot-api/telegram-bot-api"
-	"robot/bfApi"
-	"robot/config_manage"
-	"robot/utils"
 )
 
 var bot *tgbotapi.BotAPI
@@ -29,6 +26,22 @@ var numericKeyboard = tgbotapi.NewReplyKeyboard(
 	//),
 )
 
+var inlineKeyboard = tgbotapi.NewInlineKeyboardMarkup(
+	tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("/help", HelpCommand()),
+	),
+	//tgbotapi.NewKeyboardButtonRow(
+	//	tgbotapi.NewKeyboardButton("利息"),
+	//	//tgbotapi.NewKeyboardButton("放貸金額"),
+	//	//tgbotapi.NewKeyboardButton("錢包"),
+	//	tgbotapi.NewKeyboardButton("config"),
+	//),
+)
+
+func HelpCommand() string {
+	return "利息"
+}
+
 type Rate float64
 
 var ActionBook = map[string]string{
@@ -44,10 +57,10 @@ func BotInit() {
 		}
 
 		bot.Debug = true
-
 		log.Printf("Authorized on account %s", bot.Self.UserName)
 	}
 
+	Listen()
 }
 
 func Listen() {
@@ -66,24 +79,89 @@ func Listen() {
 			}
 
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-
-			switch update.Message.Text {
-			case "open":
-				msg.ReplyMarkup = numericKeyboard
+			switch update.Message.Command() {
+			case "register":
+				args := parseText(update.Message.CommandArguments())
+				if len(args) != 2 {
+					msg.Text = "請輸入正確格式: /register [token]:[password]"
+					break
+				}
+				msg.Text = handler.RegisterHandle(model.RegisterRequest{
+					UserId: update.Message.Chat.ID,
+					Name:   update.Message.Chat.FirstName,
+					Token:  args[0],
+					Sec:    args[1],
+				})
 				break
-			case "close":
-				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+			case "rate":
+				msg.Text = handler.CalculateRateHandle(update.Message.Chat.ID)
+				break
+			case "set":
+				args := parseText(update.Message.CommandArguments())
+				if len(args) != 2 {
+					msg.Text = "請輸入正確格式: /set [key]:[value]"
+					break
+				}
+
+				msg.Text = handler.UpdateConfigHandle(update.Message.Chat.ID, args[0], args[1])
 				break
 			case "config":
-				content, _ := utils.JsonString(config_manage.Config)
-				msg.Text = content
+				msg.Text = handler.LookConfig(update.Message.Chat.ID)
 				break
-			case "利息":
-				msg.Text = GetInterestInfo()
-			default:
-				key, val := parseText(update.Message.Text)
-				msg.Text = ReplyAction(key, val)
+			case "interest":
+				msg.Text = handler.GetInterest(update.Message.Chat.ID)
+				break
+			case "quit":
+				msg.Text = handler.Quit(update.Message.Chat.ID)
+				break
+			case "kill":
+				msg.Text = handler.Kill(update.Message.Chat.ID, update.Message.CommandArguments())
+				break
+			case "start":
+				msg.Text = handler.Start(update.Message.Chat.ID)
+				break
+			case "stop":
+				msg.Text = handler.Stop(update.Message.Chat.ID)
+				break
+			case "help":
+				msg.Text = ` /register \[token]:\[password]  //註冊放貸機器人
+/set \[key]:\[value] //更新機器人設定 
+/start //機器人開始運作
+/stop //機器人停止運作
+/config //查看機器人設定 
+/interest //查看利息所得 
+`
+				msg.ParseMode = tgbotapi.ModeMarkdown
+				break
+
+				//case "wallets":
+				//	msg.Text = handler.Wallets(update.Message.Chat.ID)
+				//	break
 			}
+
+			//switch update.Message.Text {
+			//case "tt":
+			//	msg.ReplyMarkup = inlineKeyboard
+			//	break
+			////case "/help":
+			////	msg.text = inlineKeyboard
+			//case "open":
+			//	msg.ReplyMarkup = numericKeyboard
+			//	break
+			//case "close":
+			//	msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+			//	break
+			//case "config":
+			//	content, _ := utils.JsonString(config_manage.Config)
+			//	msg.Text = content
+			//	break
+			//case "利息":
+			//	msg.Text = "功能未完成"
+			//	//msg.Text = GetInterestInfo()
+			//default:
+			//	key, val := parseText(update.Message.Text)
+			//	msg.Text = ReplyAction(key, val)
+			//}
 
 			if msg.Text == "" {
 				continue
@@ -94,17 +172,6 @@ func Listen() {
 			}
 		}
 	}()
-}
-
-func SendMessage(chatId int64, text string) {
-	if bot == nil {
-		BotInit()
-	}
-
-	msg := tgbotapi.NewMessage(chatId, text)
-	if _, err := bot.Send(msg); err != nil {
-		log.Printf("Send Message Error : %v", err)
-	}
 }
 
 func ServerMessage(text string) {
@@ -123,109 +190,18 @@ func Close() {
 	bot.StopReceivingUpdates()
 }
 
-func parseText(input string) (string, string) {
+func parseText(input string) []string {
 	input = strings.Replace(input, " ", "", -1)
-	split := strings.Split(input, ":")
+	return strings.Split(input, ":")
 
-	switch len(split) {
-	case 0:
-		return "", ""
-	case 1:
-		return split[0], ""
-	case 2:
-		return split[0], split[1]
-	default:
-		return "", ""
-	}
+	//switch len(split) {
+	//case 0:
+	//	return "", ""
+	//case 1:
+	//	return split[0], ""
+	//case 2:
+	//	return split[0], split[1]
+	//default:
+	//	return "", ""
+	//}
 }
-
-func ReplyAction(key, val string) (reply string) {
-	if val == "" || key == "" {
-		return "找不到對應動作"
-	}
-
-	reply = "執行完畢"
-	switch key {
-	case "CrazyRate":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetCrazyRate(rate)
-		break
-	case "IncreaseRate":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetIncreaseRate(rate)
-		break
-	case "BottomRate":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetBottomRate(rate)
-		break
-	case "FixedAmount":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetFixedAmount(rate)
-		break
-	case "InValidRate":
-		rate, _ := strconv.ParseFloat(val, 64)
-		config_manage.Config.SetInValidRate(rate)
-		break
-	case "Day":
-		day, _ := strconv.Atoi(val)
-		config_manage.Config.SetDay(day)
-		break
-	case "SubmitOffer":
-		config_manage.Config.SetSubmitOffer(val == "Y" || val == "y")
-		break
-	default:
-		reply = "找不到對應動作"
-	}
-
-	return reply
-}
-
-type DailyInterestReport struct {
-	Balance float64 `json:"錢包總額"`
-	TotalInterest float64 `json:"利息總額"`
-	InterestList []map[string]interface{} `json:"利息清單"`
-}
-
-// 取得近十天的利息
-func GetInterestInfo() string {
-	report := &DailyInterestReport{}
-
-	end := time.Now().UnixNano()/ int64(time.Millisecond)
-	list := bfApi.GetLedgers(end)
-	count := 0
-	for len(list) > 0 {
-		for _, data := range list {
-
-			if data.Description == "Margin Funding Payment on wallet funding" {
-				count++
-
-				// 第一筆為總金額
-				if count == 1 {
-					report.Balance = data.Balance
-				}
-
-				report.TotalInterest += data.Amount
-
-				if count > 10 {
-					continue
-				}
-				earnInfo := map[string]interface{}{}
-				dateTime := time.Unix(data.MTS/1000, 0).Format("2006-01-02 15:04:05")
-				earnInfo["Date"] = dateTime
-				earnInfo["Interest"] = data.Amount
-				report.InterestList = append(report.InterestList, earnInfo)
-			}
-			end = data.MTS
-		}
-
-		list = bfApi.GetLedgers(end-1)
-	}
-
-
-
-	content, _ := utils.JsonString(report)
-	//ServerMessage(content)
-	log.Print("Get Interest Info Done")
-	return content
-}
-

@@ -17,6 +17,6 @@ func JsonString(val interface{}) (string, error) {
 	return string(json), nil
 }
 
-func PrintWithStruct(val interface{}) {
+func PrintWithStruct(val ...interface{}) {
 	spew.Dump(val)
 }

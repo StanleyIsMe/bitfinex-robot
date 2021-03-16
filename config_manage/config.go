@@ -18,7 +18,7 @@ type ConfigManage struct {
 	SubmitOffer  bool           `json:"自動放貸"`
 	InValidRate  float64        `json:"無效利率"`
 	Weights      map[string]int `json:"利率計算權重"`
-	//Policy func()float64 `json:"-"`
+
 }
 
 var Config *ConfigManage
