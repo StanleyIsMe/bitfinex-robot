@@ -47,7 +47,7 @@ func main() {
 
 	calAmount := 0.0
 	var rateRrr []float64
-	targetAmount := 3000000.0
+	targetAmount := 8000000.0
 	for _, rate := range rates {
 		calAmount+=allBook[rate]
 
