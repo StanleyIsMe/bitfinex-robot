@@ -36,14 +36,10 @@ func main() {
 	redis.Init()
 	//bfApi.ApiInit()
 	user.NewPool(5)
-	//demo()
 
 	s2c.NewTgMessage()
 	//policy.InitPolicy()
 	telegramBot.BotInit()
-	//telegramBot.Listen()
-	//bfApi.ApiInit()
-	//bfSocket.SocketInit()
 	crontab.Start()
 
 
